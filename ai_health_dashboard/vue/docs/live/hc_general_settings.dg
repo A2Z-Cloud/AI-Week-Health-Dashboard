@@ -1,0 +1,484 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_general_settings
+// Section : general_settings
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Captured response: hc_general_settings.response.json
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_general_settings(String params)
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+STALE_FX = 180;
+response = Map();
+response.put("ok",true);
+response.put("section","general_settings");
+checks = Map();
+meta = Map();
+// ════════════════════════════════════════════════════
+// 1. GET /org
+// ════════════════════════════════════════════════════
+orgResp = invokeurl
+[
+	url :BASE + "/org"
+	type :GET
+	connection:"crm_healthcheck"
+];
+orgList = orgResp.get("org");
+if(orgList == null || orgList.size() == 0)
+{
+	response.put("ok",false);
+	response.put("error","GET /org returned no data");
+	return response.toString();
+}
+org = orgList.get(0);
+// — company_details —
+cdVal = Map();
+cdVal.put("company_name",ifNull(org.get("company_name"),""));
+cdVal.put("country",ifNull(org.get("country"),""));
+cdVal.put("time_zone",ifNull(org.get("time_zone"),""));
+cdVal.put("primary_email",ifNull(org.get("primary_email"),""));
+cdVal.put("phone",ifNull(org.get("phone"),""));
+cdCheck = Map();
+cdCheck.put("status","review");
+cdCheck.put("value",cdVal);
+cdCheck.put("comment","Verify company details are correct.");
+checks.put("company_details",cdCheck);
+// — fiscal_year — GET /settings/fiscal_year
+try
+{
+	fyResp = invokeurl
+	[
+		url :BASE + "/settings/fiscal_year"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	fyData = ifNull(fyResp.get("fiscal_year"),null);
+	fyMonth = "";
+	fyDisplayBasedOn = "";
+	if(fyData != null)
+	{
+		fyMonth = ifNull(fyData.get("start_month"),"");
+		fyDisplayBasedOn = ifNull(fyData.get("display_based_on"),"");
+	}
+	if(fyMonth != null && fyMonth.toString() != "")
+	{
+		fyVal = Map();
+		fyVal.put("start_month",fyMonth);
+		fyVal.put("display_based_on",fyDisplayBasedOn);
+		fyCheck = Map();
+		fyCheck.put("status","ok");
+		fyCheck.put("value",fyVal);
+		fyCheck.put("comment","Fiscal year starts in " + fyMonth + ".");
+		checks.put("fiscal_year",fyCheck);
+	}
+	else
+	{
+		fyCheck = Map();
+		fyCheck.put("status","bad");
+		fyCheck.put("value","");
+		fyCheck.put("comment","Fiscal year start month is not set.");
+		checks.put("fiscal_year",fyCheck);
+	}
+}
+catch (eFY)
+{
+	fyCheck = Map();
+	fyCheck.put("status","review");
+	fyCheck.put("value","");
+	fyCheck.put("comment","Could not read fiscal year: " + eFY.toString());
+	checks.put("fiscal_year",fyCheck);
+}
+// — language_timezone —
+tz = ifNull(org.get("time_zone"),"");
+locale = ifNull(org.get("country_locale"),"");
+ltVal = Map();
+ltVal.put("time_zone",tz);
+ltVal.put("locale",locale);
+if(tz != "" && locale != "")
+{
+	ltCheck = Map();
+	ltCheck.put("status","ok");
+	ltCheck.put("value",ltVal);
+	ltCheck.put("comment","Time zone and locale are configured.");
+	checks.put("language_timezone",ltCheck);
+}
+else
+{
+	ltCheck = Map();
+	ltCheck.put("status","warning");
+	ltCheck.put("value",ltVal);
+	ltCheck.put("comment","Time zone or locale may not be fully configured.");
+	checks.put("language_timezone",ltCheck);
+}
+mcStatus = ifNull(org.get("mc_status"),false);
+// ════════════════════════════════════════════════════
+// 2. GET /org/currencies
+// ════════════════════════════════════════════════════
+try
+{
+	currResp = invokeurl
+	[
+		url :BASE + "/org/currencies"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	allCurrencies = ifNull(currResp.get("currencies"),List());
+	activeCurr = List();
+	for each  c in allCurrencies
+	{
+		if(ifNull(c.get("is_active"),true))
+		{
+			activeCurr.add(c);
+		}
+	}
+	if(activeCurr.size() == 0)
+	{
+		csCheck = Map();
+		csCheck.put("status","warning");
+		csCheck.put("value",0);
+		csCheck.put("comment","No active currencies found.");
+		checks.put("currency_settings",csCheck);
+	}
+	else if(mcStatus && activeCurr.size() == 1)
+	{
+		csCheck = Map();
+		csCheck.put("status","warning");
+		csCheck.put("value",1);
+		csCheck.put("comment","Multi-currency is enabled but only one active currency exists.");
+		checks.put("currency_settings",csCheck);
+	}
+	else
+	{
+		csCheck = Map();
+		csCheck.put("status","ok");
+		csCheck.put("value",activeCurr.size());
+		csCheck.put("comment","Active currencies look healthy.");
+		checks.put("currency_settings",csCheck);
+	}
+	today = zoho.currenttime;
+	staleList = {};
+	nonBaseCurr = {};
+	for each  c in activeCurr
+	{
+		if(!ifNull(c.get("is_base"),false))
+		{
+			nonBaseCurr.add(c);
+		}
+	}
+	if(nonBaseCurr.size() == 0)
+	{
+		fxCheck = Map();
+		fxCheck.put("status","ok");
+		fxCheck.put("value","base currency only");
+		fxCheck.put("comment","No non-base currencies to check.");
+		checks.put("multi_currency_rates",fxCheck);
+	}
+	else
+	{
+		for each  c in nonBaseCurr
+		{
+			modStr = c.get("modified_time");
+			if(modStr != null && modStr.toString() != "")
+			{
+				modDateStr = modStr.toString().getPrefix("T");
+				modDate = modDateStr.toDate("yyyy-MM-dd");
+				diffDays = daysBetween(modDate,today);
+				if(diffDays > STALE_FX)
+				{
+					staleEntry = Map();
+					staleEntry.put("currency",ifNull(c.get("iso_code"),"?"));
+					staleEntry.put("last_updated",modStr.toString());
+					staleEntry.put("days_since",diffDays);
+					staleList.add(staleEntry);
+				}
+			}
+		}
+		if(staleList.size() > 0)
+		{
+			fxCheck = Map();
+			fxCheck.put("status","warning");
+			fxCheck.put("value",staleList);
+			fxCheck.put("comment",staleList.size() + " currency exchange rate(s) not updated in over " + STALE_FX + " days.");
+			checks.put("multi_currency_rates",fxCheck);
+		}
+		else
+		{
+			fxCheck = Map();
+			fxCheck.put("status","ok");
+			fxCheck.put("value",nonBaseCurr.size() + " non-base currency(s) rates current");
+			fxCheck.put("comment","All exchange rates updated within " + STALE_FX + " days.");
+			checks.put("multi_currency_rates",fxCheck);
+		}
+	}
+}
+catch (eCurr)
+{
+	csCheck = Map();
+	csCheck.put("status","review");
+	csCheck.put("value","");
+	csCheck.put("comment","Could not fetch currencies: " + eCurr.toString());
+	checks.put("currency_settings",csCheck);
+	fxCheck = Map();
+	fxCheck.put("status","review");
+	fxCheck.put("value","");
+	fxCheck.put("comment","Could not fetch exchange rates: " + eCurr.toString());
+	checks.put("multi_currency_rates",fxCheck);
+}
+// ════════════════════════════════════════════════════
+// 3. GET /settings/variables
+// ════════════════════════════════════════════════════
+try
+{
+	varResp = invokeurl
+	[
+		url :BASE + "/settings/variables"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	variables = ifNull(varResp.get("variables"),{});
+	blankVars = {};
+	placeholders = {"todo","xxx","test","tbd","placeholder","n/a"};
+	for each  v in variables
+	{
+		val = ifNull(v.get("value"),"").toString().toLowerCase().trim();
+		if(val == "" || placeholders.contains(val))
+		{
+			blankEntry = Map();
+			blankEntry.put("name",ifNull(v.get("name"),"?"));
+			blankEntry.put("value",ifNull(v.get("value"),""));
+			blankVars.add(blankEntry);
+		}
+	}
+	ovVal = Map();
+	ovVal.put("total",variables.size());
+	ovVal.put("blank_or_placeholder",blankVars);
+	if(blankVars.size() > 0)
+	{
+		ovCheck = Map();
+		ovCheck.put("status","warning");
+		ovCheck.put("value",ovVal);
+		ovCheck.put("comment",blankVars.size() + " org variable(s) have blank or placeholder values.");
+		checks.put("org_variables",ovCheck);
+	}
+	else
+	{
+		ovCheck = Map();
+		ovCheck.put("status","ok");
+		ovCheck.put("value",ovVal);
+		ovCheck.put("comment","All " + variables.size() + " org variables have non-blank values.");
+		checks.put("org_variables",ovCheck);
+	}
+}
+catch (eVar)
+{
+	ovCheck = Map();
+	ovCheck.put("status","review");
+	ovCheck.put("value","");
+	ovCheck.put("comment","Could not fetch org variables: " + eVar.toString());
+	checks.put("org_variables",ovCheck);
+}
+// ════════════════════════════════════════════════════
+// 4. GET /settings/business_hours + /settings/holidays
+// ════════════════════════════════════════════════════
+try
+{
+	bhResp = invokeurl
+	[
+		url :BASE + "/settings/business_hours"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	bhData = bhResp.get("business_hours");
+	if(bhData == null || bhData.toString() == "{}" || bhData.toString() == "[]" || bhData.toString() == "")
+	{
+		bhCheck = Map();
+		bhCheck.put("status","bad");
+		bhCheck.put("value","");
+		bhCheck.put("comment","Business hours are not configured.");
+		checks.put("business_hours",bhCheck);
+	}
+	else
+	{
+		try
+		{
+			holResp = invokeurl
+			[
+				url :BASE + "/settings/holidays"
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			holidays = ifNull(holResp.get("holidays"),{});
+			currentYear = zoho.currenttime.getYear();
+			yearStr = currentYear.toString();
+			thisYearHols = {};
+			for each  h in holidays
+			{
+				dateStr = ifNull(h.get("date"),"");
+				if(dateStr.startsWith(yearStr))
+				{
+					thisYearHols.add(h);
+				}
+			}
+			bhVal = Map();
+			bhVal.put("business_hours_configured",true);
+			bhVal.put("holidays_this_year",thisYearHols.size());
+			if(thisYearHols.size() == 0)
+			{
+				bhCheck = Map();
+				bhCheck.put("status","warning");
+				bhCheck.put("value",bhVal);
+				bhCheck.put("comment","Business hours configured but no holidays set for " + yearStr + ".");
+				checks.put("business_hours",bhCheck);
+			}
+			else
+			{
+				bhCheck = Map();
+				bhCheck.put("status","ok");
+				bhCheck.put("value",bhVal);
+				bhCheck.put("comment","Business hours and " + thisYearHols.size() + " holiday(s) for " + yearStr + " are configured.");
+				checks.put("business_hours",bhCheck);
+			}
+		}
+		catch (eHol)
+		{
+			bhVal2 = Map();
+			bhVal2.put("business_hours_configured",true);
+			bhCheck = Map();
+			bhCheck.put("status","warning");
+			bhCheck.put("value",bhVal2);
+			bhCheck.put("comment","Business hours configured; could not fetch holidays: " + eHol.toString());
+			checks.put("business_hours",bhCheck);
+		}
+	}
+}
+catch (eBH)
+{
+	bhCheck = Map();
+	bhCheck.put("status","review");
+	bhCheck.put("value","");
+	bhCheck.put("comment","Could not fetch business hours: " + eBH.toString());
+	checks.put("business_hours",bhCheck);
+}
+// ════════════════════════════════════════════════════
+// 5. GET /crm/bulk/v8/backup
+// ════════════════════════════════════════════════════
+try
+{
+	backupResp = invokeurl
+	[
+		url :"https://www.zohoapis.eu/crm/bulk/v8/backup"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	backupCode = ifNull(backupResp.get("code"),"");
+	backupStatus = ifNull(backupResp.get("status"),"");
+	if(backupCode == "OAUTH_SCOPE_MISMATCH" || backupCode == "INVALID_SCOPE" || backupCode == "PERMISSION_DENIED" || backupStatus == "error")
+	{
+		dbCheck = Map();
+		dbCheck.put("status","review");
+		dbCheck.put("value","");
+		dbCheck.put("comment","Cannot read backup info — requires admin profile and ZohoCRM.bulk.READ scope.");
+		checks.put("data_backup",dbCheck);
+	}
+	else
+	{
+		backupData = backupResp.get("backup");
+		if(backupData == null)
+		{
+			dbCheck = Map();
+			dbCheck.put("status","warning");
+			dbCheck.put("value","");
+			dbCheck.put("comment","No scheduled backup found.");
+			checks.put("data_backup",dbCheck);
+		}
+		else
+		{
+			backupStatusVal = ifNull(backupData.get("status"),"").toString().toUpperCase();
+			nextBackup = ifNull(backupData.get("next_trigger_time"),"not scheduled");
+			rrule = ifNull(backupData.get("rrule"),"");
+			backupVal = Map();
+			backupVal.put("status",backupStatusVal);
+			backupVal.put("next_trigger_time",nextBackup);
+			backupVal.put("rrule",rrule);
+			if(backupStatusVal == "SCHEDULED" || backupStatusVal == "COMPLETED" || backupStatusVal == "INPROGRESS")
+			{
+				dbCheck = Map();
+				dbCheck.put("status","ok");
+				dbCheck.put("value",backupVal);
+				dbCheck.put("comment","Scheduled backup is configured. Next run: " + nextBackup);
+				checks.put("data_backup",dbCheck);
+			}
+			else if(backupStatusVal == "STOPPED" || backupStatusVal == "FAILED")
+			{
+				dbCheck = Map();
+				dbCheck.put("status","bad");
+				dbCheck.put("value",backupVal);
+				dbCheck.put("comment","Backup is " + backupStatusVal + " — check Setup.");
+				checks.put("data_backup",dbCheck);
+			}
+			else
+			{
+				dbCheck = Map();
+				dbCheck.put("status","warning");
+				dbCheck.put("value",backupVal);
+				dbCheck.put("comment","Backup exists but status is unclear: " + backupStatusVal);
+				checks.put("data_backup",dbCheck);
+			}
+		}
+	}
+}
+catch (eBack)
+{
+	dbCheck = Map();
+	dbCheck.put("status","review");
+	dbCheck.put("value","");
+	dbCheck.put("comment","Could not fetch backup info: " + eBack.toString());
+	checks.put("data_backup",dbCheck);
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),List()));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),List()));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),List()));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),List()));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}

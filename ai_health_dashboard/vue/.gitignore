@@ -1,0 +1,6 @@
+node_modules/
+app/assets/
+.env
+.env.*
+.DS_Store
+*.log

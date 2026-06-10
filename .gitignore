@@ -1,0 +1,9 @@
+node_modules/
+*.pem
+ZET-debug.log
+ai_health_dashboard/ZET-debug.log
+ai_health_dashboard/app/assets/
+.DS_Store
+*.log
+.env
+.env.*

@@ -1,0 +1,75 @@
+{
+  "ok": true,
+  "section": "general_settings",
+  "checks": {
+    "company_details": {
+      "status": "review",
+      "value": { "company_name": "Cloud Dynamics", "country": "", "time_zone": "Europe/London", "primary_email": "dev_demo1@a2zcloud.eu.com", "phone": "07760806313" },
+      "comment": "Verify company details are correct."
+    },
+    "fiscal_year": {
+      "status": "ok",
+      "value": { "start_month": "MAY", "display_based_on": "start_month" },
+      "comment": "Fiscal year starts in MAY."
+    },
+    "language_timezone": {
+      "status": "warning",
+      "value": { "time_zone": "Europe/London", "locale": "" },
+      "comment": "Time zone or locale may not be fully configured."
+    },
+    "currency_settings": {
+      "status": "ok",
+      "value": 8,
+      "comment": "Active currencies look healthy."
+    },
+    "multi_currency_rates": {
+      "status": "warning",
+      "value": [
+        { "currency": "USD", "last_updated": "2022-03-02T15:46:32+00:00", "days_since": 1561 },
+        { "currency": "LKR", "last_updated": "2023-06-29T12:34:11+01:00", "days_since": 1077 },
+        { "currency": "NGN", "last_updated": "2025-10-20T11:06:32+01:00", "days_since": 233 },
+        { "currency": "EUR", "last_updated": "2023-06-29T12:37:01+01:00", "days_since": 1077 },
+        { "currency": "JPY", "last_updated": "2024-05-20T11:52:20+01:00", "days_since": 751 },
+        { "currency": "ERN", "last_updated": "2024-08-22T10:01:07+01:00", "days_since": 657 }
+      ],
+      "comment": "6 currency exchange rate(s) not updated in over 180 days."
+    },
+    "org_variables": {
+      "status": "ok",
+      "value": { "total": 10, "blank_or_placeholder": [] },
+      "comment": "All 10 org variables have non-blank values."
+    },
+    "business_hours": {
+      "status": "warning",
+      "value": { "business_hours_configured": true, "holidays_this_year": 0 },
+      "comment": "Business hours configured but no holidays set for 2026."
+    },
+    "data_backup": {
+      "status": "ok",
+      "value": { "status": "COMPLETED", "next_trigger_time": "not scheduled", "rrule": "" },
+      "comment": "Scheduled backup is configured. Next run: not scheduled"
+    }
+  },
+  "meta": { "fetched_at": "2026-06-10 11:37:49" },
+  "ai_summary": {
+    "summary": "The CRM is generally stable with correct company details and active currencies. However, several configuration issues, including outdated exchange rates and missing holidays, require attention to ensure data accuracy and operational compliance.",
+    "critical": [],
+    "warnings": [
+      "Time zone or locale is not fully configured, which may affect user experience and data consistency.",
+      "Six currency exchange rates are not updated in over 180 days, risking inaccurate financial reporting.",
+      "No holidays are set for 2026, which could impact scheduling and automation accuracy."
+    ],
+    "positives": [
+      "All 10 org variables have non-blank values, ensuring consistent organisation-wide data.",
+      "Business hours are configured, supporting operational planning.",
+      "Data backup is completed and scheduled, ensuring data protection."
+    ],
+    "recommended_actions": [
+      "Update all currency exchange rates, especially USD, LKR, and EUR, which have not been refreshed in over 1500 days.",
+      "Configure holidays for 2026 to ensure accurate business hour and automation rules.",
+      "Set a valid locale in the language and timezone settings to improve user experience.",
+      "Review and validate the primary email and phone number to ensure they match company records.",
+      "Verify that the fiscal year start month (MAY) aligns with business operations and financial reporting cycles."
+    ]
+  }
+}

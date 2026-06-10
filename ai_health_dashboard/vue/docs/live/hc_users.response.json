@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "section": "users",
+  "checks": {
+    "user_counts": {
+      "status": "ok",
+      "value": { "total": 8, "active": 2, "deactivated": 5, "unconfirmed": 3, "admins": 1 },
+      "comment": "8 total users — 2 active, 5 deactivated, 3 unconfirmed."
+    },
+    "unconfirmed_users": {
+      "status": "warning",
+      "value": {
+        "count": 3,
+        "users": [
+          { "name": "Test3 User3", "email": "testuser3@a2zcloud.eu.com" },
+          { "name": "Test1 User1", "email": "testuser1@a2zcloud.eu.com" },
+          { "name": "Test2 User2", "email": "testuser2@a2zcloud.eu.com" }
+        ]
+      },
+      "comment": "3 user(s) invited but have not yet confirmed their account — they cannot log in until they do."
+    },
+    "deactivated_users": {
+      "status": "warning",
+      "value": {
+        "count": 5,
+        "users": [
+          { "name": "Test Test User", "email": "testuser@a2zcloud.eu.com", "role": "Test Role Manager" },
+          { "name": "Scott Holland", "email": "scott.holl123a2z@gmail.com", "role": "CEO" },
+          { "name": "Test3 User3", "email": "testuser3@a2zcloud.eu.com", "role": "CEO" },
+          { "name": "Test1 User1", "email": "testuser1@a2zcloud.eu.com", "role": "CEO" },
+          { "name": "Test2 User2", "email": "testuser2@a2zcloud.eu.com", "role": "CEO" }
+        ]
+      },
+      "comment": "5 deactivated user(s) — verify their records have been reassigned to active users."
+    },
+    "admin_users": {
+      "status": "ok",
+      "value": { "count": 1, "users": [ { "name": "Owlfred Haze", "email": "dev_demo1@a2zcloud.eu.com" } ] },
+      "comment": "1 admin user(s) — within reasonable limits."
+    },
+    "roles_summary": {
+      "status": "ok",
+      "value": { "count": 9, "roles": ["CEO", "Manager", "Standard", "Junior", "Test Role Manager", "Test Role Standard", "Test Role Junior", "Test", "CRM Admin"] },
+      "comment": "9 role(s) configured."
+    },
+    "profiles_summary": {
+      "status": "ok",
+      "value": { "count": 5, "profiles": ["Administrator", "Standard", "Administrator - Editable", "Standard - Editable", "Gas Contractor"] },
+      "comment": "5 profile(s) configured."
+    }
+  },
+  "meta": { "fetched_at": "2026-06-10 11:32:00" },
+  "ai_summary": {
+    "summary": "The CRM has a small number of active users and a significant number of unconfirmed and deactivated accounts. Overall structure is stable with adequate roles and profiles, but user management requires immediate attention to prevent access issues and data misalignment.",
+    "critical": [],
+    "warnings": [
+      "3 unconfirmed users have not verified their accounts and cannot log in — they must confirm to gain access.",
+      "5 deactivated users are currently inactive, including key roles like CEO and Manager — their records should be reassigned to active users to maintain operational continuity."
+    ],
+    "positives": [
+      "1 admin user is present and within reasonable limits.",
+      "9 roles and 5 profiles are configured, providing sufficient flexibility for user access and permissions."
+    ],
+    "recommended_actions": [
+      "Require all 3 unconfirmed users to confirm their accounts via email to enable login access.",
+      "Reassign responsibilities from the 5 deactivated users (including CEO and Manager roles) to active users.",
+      "Review the list of test roles (e.g., 'Test Role Manager') to determine if they should be removed or renamed.",
+      "Verify that the 'Gas Contractor' profile is correctly assigned to relevant users.",
+      "Audit user access logs to ensure no sensitive data is accessed by unconfirmed or deactivated accounts."
+    ]
+  }
+}

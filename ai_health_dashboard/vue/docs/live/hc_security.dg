@@ -1,0 +1,195 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_security
+// Section : security  (feeds security_settings section)
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Captured response: hc_security.response.json
+// auto_keys: gdpr_compliance, hipaa_compliance, user_licences, territories,
+//            audit_log, password_policy, two_factor_auth, ip_restrictions
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_security()
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+response = Map();
+response.put("ok",true);
+response.put("section","security");
+checks = Map();
+meta = Map();
+try
+{
+	// ════════════════════════════════════════════════════
+	// 1. GDPR & HIPAA from GET /org
+	// ════════════════════════════════════════════════════
+	try
+	{
+		orgResp = invokeurl
+		[
+			url :BASE + "/org"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		orgList = ifNull(orgResp.get("org"),{});
+		org = Map();
+		if(orgList.size() > 0){ org = orgList.get(0); }
+		gdprEnabled = ifNull(org.get("privacy_settings"),false);
+		hipaaEnabled = ifNull(org.get("hipaa_compliance_enabled"),false);
+		gdprCheck = Map();
+		if(gdprEnabled)
+		{
+			gdprCheck.put("status","ok");
+			gdprCheck.put("value",true);
+			gdprCheck.put("comment","GDPR compliance (privacy settings) is enabled for this org.");
+		}
+		else
+		{
+			gdprCheck.put("status","warning");
+			gdprCheck.put("value",false);
+			gdprCheck.put("comment","GDPR compliance is not enabled — if you process EU personal data, enable it in Setup → Security Control → Compliance Settings.");
+		}
+		checks.put("gdpr_compliance",gdprCheck);
+		hipaaCheck = Map();
+		if(hipaaEnabled)
+		{
+			hipaaCheck.put("status","ok");
+			hipaaCheck.put("value",true);
+			hipaaCheck.put("comment","HIPAA compliance is enabled for this org.");
+		}
+		else
+		{
+			hipaaCheck.put("status","review");
+			hipaaCheck.put("value",false);
+			hipaaCheck.put("comment","HIPAA compliance is not enabled — only required if you handle protected health information (PHI).");
+		}
+		checks.put("hipaa_compliance",hipaaCheck);
+	}
+	catch (eOrg)
+	{
+		gdprCheck = Map();
+		gdprCheck.put("status","review");
+		gdprCheck.put("value",null);
+		gdprCheck.put("comment","Could not read org compliance settings: " + eOrg.toString());
+		checks.put("gdpr_compliance",gdprCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 2. User licences — no API, manual
+	// ════════════════════════════════════════════════════
+	licCheck = Map();
+	licCheck.put("status","review");
+	licCheck.put("value",null);
+	licCheck.put("comment","Licence count not available via API — check Setup → Subscription → User Licences.");
+	checks.put("user_licences",licCheck);
+	// ════════════════════════════════════════════════════
+	// 3. Territories  GET /settings/territories
+	// ════════════════════════════════════════════════════
+	try
+	{
+		terrResp = invokeurl
+		[
+			url :BASE + "/settings/territories"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		territories = ifNull(terrResp.get("territories"),{});
+		terrNames = {};
+		for each  t in territories
+		{
+			terrNames.add(ifNull(t.get("name"),"?"));
+		}
+		terrCheck = Map();
+		terrCheck.put("status","ok");
+		terrCheck.put("value",Map({"count":territories.size(),"territories":terrNames}));
+		if(territories.size() == 0)
+		{
+			terrCheck.put("comment","No territories configured — territory management is not in use.");
+		}
+		else
+		{
+			terrCheck.put("comment",territories.size() + " territory/territories configured.");
+		}
+		checks.put("territories",terrCheck);
+	}
+	catch (eTerr)
+	{
+		terrCheck = Map();
+		terrCheck.put("status","review");
+		terrCheck.put("value",null);
+		terrCheck.put("comment","Could not fetch territories: " + eTerr.toString());
+		checks.put("territories",terrCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 4–7. Manual-only checks (no read API)
+	// ════════════════════════════════════════════════════
+	auditCheck = Map();
+	auditCheck.put("status","review");
+	auditCheck.put("value",null);
+	auditCheck.put("comment","Audit log status cannot be read via API — verify manually in Setup → Security Control → Audit Log. Recommended: export logs monthly.");
+	checks.put("audit_log",auditCheck);
+	pwCheck = Map();
+	pwCheck.put("status","review");
+	pwCheck.put("value",null);
+	pwCheck.put("comment","No API available to read password policy — verify manually in Setup → Security Control → Password Policy. Recommended: min 8 chars, mixed case, 90-day expiry.");
+	checks.put("password_policy",pwCheck);
+	tfaCheck = Map();
+	tfaCheck.put("status","review");
+	tfaCheck.put("value",null);
+	tfaCheck.put("comment","No API available to read two-factor auth settings — verify manually in Setup → Security Control → Two-Factor Authentication. Recommended: enforce for all users.");
+	checks.put("two_factor_auth",tfaCheck);
+	ipCheck = Map();
+	ipCheck.put("status","review");
+	ipCheck.put("value",null);
+	ipCheck.put("comment","No API available to read IP restriction settings — verify manually in Setup → Security Control → Allowed IP Addresses. Recommended: restrict to office/VPN ranges.");
+	checks.put("ip_restrictions",ipCheck);
+}
+catch (e)
+{
+	response.put("ok",false);
+	response.put("error",e.toString());
+	return response.toString();
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),{}));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),{}));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),{}));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),{}));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}

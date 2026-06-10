@@ -1,0 +1,382 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_users
+// Section : users (maps to user_management in the widget)
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Deployed in Zoho CRM. Captured response: hc_users.response.json
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_users(String params)
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+response = Map();
+response.put("ok",true);
+response.put("section","users");
+checks = Map();
+meta = Map();
+try
+{
+	// ════════════════════════════════════════════════════
+	// 1. User counts — use /users/actions/count
+	//    One call per type — fast, no pagination needed
+	// ════════════════════════════════════════════════════
+	allCount = 0;
+	activeCount = 0;
+	deactiveCount = 0;
+	confirmedCount = 0;
+	unconfirmedCount = 0;
+	adminCount = 0;
+	try
+	{
+		r = invokeurl
+		[
+			url :BASE + "/users/actions/count?type=AllUsers"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		allCount = ifNull(r.get("count"),0);
+	}
+	catch (e1)
+	{
+	}
+	try
+	{
+		r = invokeurl
+		[
+			url :BASE + "/users/actions/count?type=ActiveUsers"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		activeCount = ifNull(r.get("count"),0);
+	}
+	catch (e2)
+	{
+	}
+	try
+	{
+		r = invokeurl
+		[
+			url :BASE + "/users/actions/count?type=DeactiveUsers"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		deactiveCount = ifNull(r.get("count"),0);
+	}
+	catch (e3)
+	{
+	}
+	try
+	{
+		r = invokeurl
+		[
+			url :BASE + "/users/actions/count?type=NotConfirmedUsers"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		unconfirmedCount = ifNull(r.get("count"),0);
+	}
+	catch (e4)
+	{
+	}
+	try
+	{
+		r = invokeurl
+		[
+			url :BASE + "/users/actions/count?type=AdminUsers"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		adminCount = ifNull(r.get("count"),0);
+	}
+	catch (e5)
+	{
+	}
+	ucVal = Map();
+	ucVal.put("total",allCount);
+	ucVal.put("active",activeCount);
+	ucVal.put("deactivated",deactiveCount);
+	ucVal.put("unconfirmed",unconfirmedCount);
+	ucVal.put("admins",adminCount);
+	ucCheck = Map();
+	ucCheck.put("status","ok");
+	ucCheck.put("value",ucVal);
+	ucCheck.put("comment",allCount + " total users — " + activeCount + " active, " + deactiveCount + " deactivated, " + unconfirmedCount + " unconfirmed.");
+	checks.put("user_counts",ucCheck);
+	// ════════════════════════════════════════════════════
+	// 2. Unconfirmed users — fetch names for context
+	// ════════════════════════════════════════════════════
+	try
+	{
+		unconfResp = invokeurl
+		[
+			url :BASE + "/users?type=NotConfirmedUsers&per_page=50"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		unconfUsers = ifNull(unconfResp.get("users"),{});
+		unconfList = {};
+		for each  u in unconfUsers
+		{
+			uName = ifNull(u.get("full_name"),ifNull(u.get("first_name"),""));
+			uEmail = ifNull(u.get("email"),"");
+			uEntry = Map();
+			uEntry.put("name",uName);
+			uEntry.put("email",uEmail);
+			unconfList.add(uEntry);
+		}
+		unconfStatus = "ok";
+		if(unconfirmedCount > 0)
+		{
+			unconfStatus = "warning";
+		}
+		unconfCheck = Map();
+		unconfCheck.put("status",unconfStatus);
+		unconfCheck.put("value",Map({"count":unconfirmedCount,"users":unconfList}));
+		if(unconfStatus == "ok")
+		{
+			unconfCheck.put("comment","All invited users have confirmed their accounts.");
+		}
+		else
+		{
+			unconfCheck.put("comment",unconfirmedCount + " user(s) invited but have not yet confirmed their account — they cannot log in until they do.");
+		}
+		checks.put("unconfirmed_users",unconfCheck);
+	}
+	catch (eUC)
+	{
+		unconfCheck = Map();
+		unconfCheck.put("status","review");
+		unconfCheck.put("value",null);
+		unconfCheck.put("comment","Could not fetch unconfirmed users: " + eUC.toString());
+		checks.put("unconfirmed_users",unconfCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 3. Deactivated users — fetch names for context
+	// ════════════════════════════════════════════════════
+	try
+	{
+		deactResp = invokeurl
+		[
+			url :BASE + "/users?type=DeactiveUsers&per_page=50"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		deactUsers = ifNull(deactResp.get("users"),{});
+		deactList = {};
+		for each  u in deactUsers
+		{
+			uName = ifNull(u.get("full_name"),ifNull(u.get("first_name"),""));
+			uEmail = ifNull(u.get("email"),"");
+			uRole = "";
+			roleObj = ifNull(u.get("role"),null);
+			if(roleObj != null)
+			{
+				uRole = ifNull(roleObj.get("name"),"");
+			}
+			uEntry = Map();
+			uEntry.put("name",uName);
+			uEntry.put("email",uEmail);
+			uEntry.put("role",uRole);
+			deactList.add(uEntry);
+		}
+		deactStatus = "ok";
+		if(deactiveCount > 0)
+		{
+			deactStatus = "warning";
+		}
+		deactCheck = Map();
+		deactCheck.put("status",deactStatus);
+		deactCheck.put("value",Map({"count":deactiveCount,"users":deactList}));
+		if(deactStatus == "ok")
+		{
+			deactCheck.put("comment","No deactivated users found.");
+		}
+		else
+		{
+			deactCheck.put("comment",deactiveCount + " deactivated user(s) — verify their records have been reassigned to active users.");
+		}
+		checks.put("deactivated_users",deactCheck);
+	}
+	catch (eDA)
+	{
+		deactCheck = Map();
+		deactCheck.put("status","review");
+		deactCheck.put("value",null);
+		deactCheck.put("comment","Could not fetch deactivated users: " + eDA.toString());
+		checks.put("deactivated_users",deactCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 4. Admin users — too many admins is a risk
+	// ════════════════════════════════════════════════════
+	try
+	{
+		adminResp = invokeurl
+		[
+			url :BASE + "/users?type=AdminUsers&per_page=50"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		adminUsers = ifNull(adminResp.get("users"),{});
+		adminList = {};
+		for each  u in adminUsers
+		{
+			uName = ifNull(u.get("full_name"),ifNull(u.get("first_name"),""));
+			uEmail = ifNull(u.get("email"),"");
+			uEntry = Map();
+			uEntry.put("name",uName);
+			uEntry.put("email",uEmail);
+			adminList.add(uEntry);
+		}
+		adminStatus = "ok";
+		if(adminCount > 5)
+		{
+			adminStatus = "warning";
+		}
+		adminCheck = Map();
+		adminCheck.put("status",adminStatus);
+		adminCheck.put("value",Map({"count":adminCount,"users":adminList}));
+		if(adminStatus == "ok")
+		{
+			adminCheck.put("comment",adminCount + " admin user(s) — within reasonable limits.");
+		}
+		else
+		{
+			adminCheck.put("comment",adminCount + " admin users — this is high. Review and reduce to only those who genuinely need full access.");
+		}
+		checks.put("admin_users",adminCheck);
+	}
+	catch (eAD)
+	{
+		adminCheck = Map();
+		adminCheck.put("status","review");
+		adminCheck.put("value",null);
+		adminCheck.put("comment","Could not fetch admin users: " + eAD.toString());
+		checks.put("admin_users",adminCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 5. Roles — GET /settings/roles
+	// ════════════════════════════════════════════════════
+	try
+	{
+		roleResp = invokeurl
+		[
+			url :BASE + "/settings/roles"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		roles = ifNull(roleResp.get("roles"),{});
+		roleNames = {};
+		for each  r in roles
+		{
+			roleNames.add(ifNull(r.get("name"),"?"));
+		}
+		rolesCheck = Map();
+		rolesCheck.put("status","ok");
+		rolesCheck.put("value",Map({"count":roles.size(),"roles":roleNames}));
+		rolesCheck.put("comment",roles.size() + " role(s) configured.");
+		checks.put("roles_summary",rolesCheck);
+	}
+	catch (eR)
+	{
+		rolesCheck = Map();
+		rolesCheck.put("status","review");
+		rolesCheck.put("value",null);
+		rolesCheck.put("comment","Could not fetch roles: " + eR.toString());
+		checks.put("roles_summary",rolesCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 6. Profiles — GET /settings/profiles
+	// ════════════════════════════════════════════════════
+	try
+	{
+		profResp = invokeurl
+		[
+			url :BASE + "/settings/profiles"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		profiles = ifNull(profResp.get("profiles"),{});
+		profNames = {};
+		for each  p in profiles
+		{
+			profNames.add(ifNull(p.get("name"),"?"));
+		}
+		profStatus = "ok";
+		if(profiles.size() > 10)
+		{
+			profStatus = "warning";
+		}
+		profCheck = Map();
+		profCheck.put("status",profStatus);
+		profCheck.put("value",Map({"count":profiles.size(),"profiles":profNames}));
+		if(profStatus == "ok")
+		{
+			profCheck.put("comment",profiles.size() + " profile(s) configured.");
+		}
+		else
+		{
+			profCheck.put("comment",profiles.size() + " profiles — this is high. Review for redundancy and consolidate where possible.");
+		}
+		checks.put("profiles_summary",profCheck);
+	}
+	catch (eP)
+	{
+		profCheck = Map();
+		profCheck.put("status","review");
+		profCheck.put("value",null);
+		profCheck.put("comment","Could not fetch profiles: " + eP.toString());
+		checks.put("profiles_summary",profCheck);
+	}
+}
+catch (e)
+{
+	response.put("ok",false);
+	response.put("error",e.toString());
+	return response.toString();
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY (Zoho Creator endpoint, connection zoho_creator_ai)
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),{}));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),{}));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),{}));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),{}));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}

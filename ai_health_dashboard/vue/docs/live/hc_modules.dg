@@ -1,0 +1,433 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_modules
+// Section : modules
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Deployed in Zoho CRM. Captured response: hc_modules.response.json
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_modules()
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+// Modules to skip for deep checks — system/noise modules
+SKIP = {"Activities","Calls","Tasks","Meetings","Notes","Attachments","Events","Invitees","Visits","Social","ZohoMail","SalesInbox","Feeds","Home"};
+// Modules where low record counts are expected
+EXPECTED_LOW = {"Campaigns","Price_Books","Vendors","Purchase_Orders","Sales_Orders","Invoices","Quotes","Solutions","Products"};
+ABANDONED_THRESHOLD = 5;
+MAX_MODULES = 15;
+response = Map();
+response.put("ok",true);
+response.put("section","modules");
+checks = Map();
+meta = Map();
+try
+{
+	// ════════════════════════════════════════════════════
+	// 1. GET /settings/modules
+	//    Fields confirmed from v8 docs:
+	//    api_name, visible, generated_type, api_supported,
+	//    show_as_tab, singular_label, status
+	// ════════════════════════════════════════════════════
+	modResp = invokeurl
+	[
+		url :BASE + "/settings/modules"
+		type :GET
+		connection:"crm_healthcheck"
+	];
+	allModules = ifNull(modResp.get("modules"),{});
+	visibleMods = {};
+	hiddenMods = {};
+	customMods = {};
+	workingMods = {};
+	for each  m in allModules
+	{
+		apiName = ifNull(m.get("api_name"),"");
+		genType = ifNull(m.get("generated_type"),"");
+		apiSupported = ifNull(m.get("api_supported"),false);
+		showAsTab = ifNull(m.get("show_as_tab"),false);
+		label = ifNull(m.get("singular_label"),apiName);
+		modStatus = ifNull(m.get("status"),"");
+		if(SKIP.contains(apiName))
+		{
+			continue;
+		}
+		if(!apiSupported)
+		{
+			continue;
+		}
+		// Use status field — "visible" means shown to user
+		// Boolean "visible" field is unreliable in standalone functions
+		if(modStatus == "visible")
+		{
+			visibleMods.add(Map({"api_name":apiName,"label":label}));
+			if(showAsTab)
+			{
+				workingMods.add(Map({"api_name":apiName,"label":label}));
+			}
+		}
+		else
+		{
+			hiddenMods.add(Map({"api_name":apiName,"label":label,"status":modStatus}));
+		}
+		if(genType == "custom")
+		{
+			customMods.add(apiName);
+		}
+	}
+	mvCheck = Map();
+	mvCheck.put("status","ok");
+	mvVal = Map();
+	mvVal.put("visible_count",visibleMods.size());
+	mvVal.put("hidden_count",hiddenMods.size());
+	mvVal.put("custom_count",customMods.size());
+	mvVal.put("hidden_modules",hiddenMods);
+	mvCheck.put("value",mvVal);
+	mvCheck.put("comment",visibleMods.size() + " visible module(s), " + hiddenMods.size() + " hidden (user/system), " + customMods.size() + " custom.");
+	checks.put("module_visibility",mvCheck);
+	// ════════════════════════════════════════════════════
+	// 2–6. Per-module deep checks (capped at MAX_MODULES)
+	//      layouts, custom_fields, related_lists, tags,
+	//      record_count
+	// ════════════════════════════════════════════════════
+	layoutSummary = Map();
+	fieldSummary = Map();
+	rlSummary = Map();
+	tagSummary = Map();
+	rcSummary = Map();
+	layoutWarnings = {};
+	fieldWarnings = {};
+	tagWarnings = {};
+	rcWarnings = {};
+	modIdx = 0;
+	for each  m in workingMods
+	{
+		if(modIdx >= MAX_MODULES)
+		{
+			break;
+		}
+		modIdx = modIdx + 1;
+		apiName = ifNull(m.get("api_name"),"");
+		label = ifNull(m.get("label"),apiName);
+		// ── Layouts ──────────────────────────────────────
+		try
+		{
+			layResp = invokeurl
+			[
+				url :BASE + "/settings/layouts?module=" + apiName
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			layouts = ifNull(layResp.get("layouts"),{});
+			layoutSummary.put(apiName,layouts.size());
+			if(layouts.size() > 3)
+			{
+				layoutWarnings.add(label + " has " + layouts.size() + " layouts.");
+			}
+		}
+		catch (eLay)
+		{
+			layoutSummary.put(apiName,"error");
+		}
+		// ── Custom fields ─────────────────────────────────
+		try
+		{
+			fldResp = invokeurl
+			[
+				url :BASE + "/settings/fields?module=" + apiName
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			fields = ifNull(fldResp.get("fields"),{});
+			customCount = 0;
+			for each  f in fields
+			{
+				if(ifNull(f.get("custom_field"),false))
+				{
+					customCount = customCount + 1;
+				}
+			}
+			fVal = Map();
+			fVal.put("total",fields.size());
+			fVal.put("custom",customCount);
+			fieldSummary.put(apiName,fVal);
+			if(customCount > 50)
+			{
+				fieldWarnings.add(label + " has " + customCount + " custom fields — review for redundancy.");
+			}
+		}
+		catch (eFld)
+		{
+			fieldSummary.put(apiName,"error");
+		}
+		// ── Related lists ─────────────────────────────────
+		try
+		{
+			rlResp = invokeurl
+			[
+				url :BASE + "/settings/related_lists?module=" + apiName
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			relLists = ifNull(rlResp.get("related_lists"),{});
+			enabledRL = 0;
+			disabledRL = 0;
+			for each  rl in relLists
+			{
+				if(ifNull(rl.get("visible"),false))
+				{
+					enabledRL = enabledRL + 1;
+				}
+				else
+				{
+					disabledRL = disabledRL + 1;
+				}
+			}
+			rlVal = Map();
+			rlVal.put("enabled",enabledRL);
+			rlVal.put("disabled",disabledRL);
+			rlSummary.put(apiName,rlVal);
+		}
+		catch (eRL)
+		{
+			rlSummary.put(apiName,"error");
+		}
+		// ── Tags ──────────────────────────────────────────
+		try
+		{
+			tagResp = invokeurl
+			[
+				url :BASE + "/settings/tags?module=" + apiName
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			tags = ifNull(tagResp.get("tags"),{});
+			zeroUseList = {};
+			for each  t in tags
+			{
+				tagCount = ifNull(t.get("count"),1);
+				if(tagCount == 0)
+				{
+					zeroUseList.add(ifNull(t.get("name"),"?"));
+				}
+			}
+			tVal = Map();
+			tVal.put("total",tags.size());
+			tVal.put("zero_use",zeroUseList.size());
+			tVal.put("zero_use_names",zeroUseList);
+			tagSummary.put(apiName,tVal);
+			if(zeroUseList.size() > 0)
+			{
+				tagWarnings.add(label + " has " + zeroUseList.size() + " unused tag(s).");
+			}
+		}
+		catch (eTag)
+		{
+			tagSummary.put(apiName,"error");
+		}
+		// ── Record count ──────────────────────────────────
+		try
+		{
+			rcResp = invokeurl
+			[
+				url :BASE + "/" + apiName + "?fields=id&per_page=1"
+				type :GET
+				connection:"crm_healthcheck"
+			];
+			rcInfo = ifNull(rcResp.get("info"),Map());
+			cnt = ifNull(rcInfo.get("count"),0);
+			rcSummary.put(apiName,cnt);
+			if(cnt <= ABANDONED_THRESHOLD && !EXPECTED_LOW.contains(apiName))
+			{
+				rcWarnings.add(label + " has only " + cnt + " record(s).");
+			}
+		}
+		catch (eRC)
+		{
+			rcSummary.put(apiName,"error");
+		}
+	}
+	// ── Publish layout check ──────────────────────────────
+	layStatus = "ok";
+	if(layoutWarnings.size() > 0)
+	{
+		layStatus = "warning";
+	}
+	layCheck = Map();
+	layCheck.put("status",layStatus);
+	layCheck.put("value",layoutSummary);
+	if(layStatus == "ok")
+	{
+		layCheck.put("comment","Layout counts look reasonable across all modules.");
+	}
+	else
+	{
+		layCheck.put("comment",layoutWarnings.toString());
+	}
+	checks.put("module_layouts",layCheck);
+	// ── Publish custom fields check ───────────────────────
+	fldStatus = "ok";
+	if(fieldWarnings.size() > 0)
+	{
+		fldStatus = "warning";
+	}
+	fldCheck = Map();
+	fldCheck.put("status",fldStatus);
+	fldCheck.put("value",fieldSummary);
+	if(fldStatus == "ok")
+	{
+		fldCheck.put("comment","Custom field counts are within reasonable limits.");
+	}
+	else
+	{
+		fldCheck.put("comment",fieldWarnings.toString());
+	}
+	checks.put("custom_fields",fldCheck);
+	// ── Publish related lists check ───────────────────────
+	rlCheck = Map();
+	rlCheck.put("status","ok");
+	rlCheck.put("value",rlSummary);
+	rlCheck.put("comment","Related list visibility summary per module.");
+	checks.put("related_lists",rlCheck);
+	// ── Publish tags check ────────────────────────────────
+	tagStatus = "ok";
+	if(tagWarnings.size() > 0)
+	{
+		tagStatus = "warning";
+	}
+	tagCheck = Map();
+	tagCheck.put("status",tagStatus);
+	tagCheck.put("value",tagSummary);
+	if(tagStatus == "ok")
+	{
+		tagCheck.put("comment","No unused tags detected.");
+	}
+	else
+	{
+		tagCheck.put("comment",tagWarnings.toString());
+	}
+	checks.put("tags_audit",tagCheck);
+	// ── Publish record count check ────────────────────────
+	rcStatus = "ok";
+	if(rcWarnings.size() > 0)
+	{
+		rcStatus = "warning";
+	}
+	rcCheck = Map();
+	rcCheck.put("status",rcStatus);
+	rcCheck.put("value",rcSummary);
+	if(rcStatus == "ok")
+	{
+		rcCheck.put("comment","All visible modules have records above the minimum threshold.");
+	}
+	else
+	{
+		rcCheck.put("comment",rcWarnings.toString());
+	}
+	checks.put("record_count_baseline",rcCheck);
+	// ════════════════════════════════════════════════════
+	// 7. Global picklists
+	//    GET /settings/global_picklists
+	// ════════════════════════════════════════════════════
+	try
+	{
+		gpResp = invokeurl
+		[
+			url :BASE + "/settings/global_picklists"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		gpl = ifNull(gpResp.get("global_picklists"),{});
+		orphaned = {};
+		for each  gp in gpl
+		{
+			associations = ifNull(gp.get("associations"),{});
+			usedBy = ifNull(gp.get("used_by"),{});
+			if(associations.size() == 0 && usedBy.size() == 0)
+			{
+				orphaned.add(ifNull(gp.get("display_label"),ifNull(gp.get("name"),"?")));
+			}
+		}
+		gpStatus = "ok";
+		if(orphaned.size() > 0)
+		{
+			gpStatus = "warning";
+		}
+		gpVal = Map();
+		gpVal.put("total",gpl.size());
+		gpVal.put("orphaned_count",orphaned.size());
+		gpVal.put("orphaned",orphaned);
+		gpCheck = Map();
+		gpCheck.put("status",gpStatus);
+		gpCheck.put("value",gpVal);
+		if(gpStatus == "ok")
+		{
+			gpCheck.put("comment","All global picklists are in use.");
+		}
+		else
+		{
+			gpCheck.put("comment",orphaned.size() + " global picklist(s) not referenced by any field.");
+		}
+		checks.put("global_picklists",gpCheck);
+	}
+	catch (eGP)
+	{
+		gpCheck = Map();
+		gpCheck.put("status","review");
+		gpCheck.put("value",null);
+		gpCheck.put("comment","Could not fetch global picklists: " + eGP.toString());
+		checks.put("global_picklists",gpCheck);
+	}
+}
+catch (e)
+{
+	response.put("ok",false);
+	response.put("error",e.toString());
+	return response.toString();
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+meta.put("modules_deep_checked",modIdx);
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY (Zoho Creator endpoint, connection zoho_creator_ai)
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),{}));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),{}));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),{}));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),{}));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}

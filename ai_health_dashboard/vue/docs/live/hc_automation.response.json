@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "section": "automation",
+  "checks": {
+    "workflow_limits": {
+      "status": "ok",
+      "value": { "total_configured": 66, "active": 29, "inactive": 37, "total_limit": 2500, "active_limit": 2000 },
+      "comment": "66 workflow rules configured (29 active, 37 inactive) — well within the limit of 2500."
+    },
+    "inactive_rules": {
+      "status": "warning",
+      "value": {
+        "count": 37,
+        "examples": [
+          { "name": "Contact Role Update", "module": "Deals" },
+          { "name": "Modified but not the Owner", "module": "Contacts" },
+          { "name": "Task Notification for Missed Chats", "module": "Tasks" },
+          { "name": "Send Survey", "module": "Cases" },
+          { "name": "Process Config", "module": "Features" }
+        ]
+      },
+      "comment": "37 inactive workflow rules — review and remove rules that are no longer needed."
+    },
+    "never_executed": {
+      "status": "warning",
+      "value": {
+        "count": 8,
+        "examples": [
+          { "name": "Change_Campaign_Workdrive_Folder_Name", "module": "Campaigns", "source": "marketplace_plugin" },
+          { "name": "test opportunity", "module": "Test_Opportunites", "source": "crm" },
+          { "name": "IncludedItems_SyncfromZohoBooks", "module": "Products", "source": "crm" },
+          { "name": "Change Ownership", "module": "zohosign__ZohoSign_Documents", "source": "crm" },
+          { "name": "EMC_monthly_enrichment", "module": "Accounts", "source": "marketplace_plugin" }
+        ]
+      },
+      "comment": "8 active rules have never executed — verify their trigger conditions are correct."
+    },
+    "deprecated_rules": {
+      "status": "ok",
+      "value": { "count": 0, "rules": [] },
+      "comment": "No deprecated workflow rules found."
+    }
+  },
+  "meta": { "fetched_at": "2026-06-10 12:00:17" },
+  "ai_summary": {
+    "summary": "The CRM has a healthy number of workflow rules, with most active and inactive rules well within limits. However, there are inactive and never-executed workflows that could be cleaned up or reviewed for accuracy.",
+    "critical": [],
+    "warnings": [
+      "37 inactive workflow rules exist, including 'Contact Role Update' and 'Modified but not the Owner' — review and deactivate unused rules.",
+      "8 active workflow rules have never executed, such as 'Change_Campaign_Workdrive_Folder_Name' and 'test opportunity' — verify trigger conditions are correctly set."
+    ],
+    "positives": [
+      "All workflow rules are within the total and active limits of 2500 and 2000 respectively.",
+      "No deprecated workflow rules were found, indicating good rule maintenance."
+    ],
+    "recommended_actions": [
+      "Review and deactivate the 37 inactive workflow rules, particularly 'Contact Role Update' and 'Modified but not the Owner'.",
+      "Investigate why 8 active rules like 'Change_Campaign_Workdrive_Folder_Name' have never executed — check trigger conditions and data eligibility.",
+      "Ensure all workflow rules are aligned with current business processes.",
+      "Schedule a quarterly audit of workflow rules to identify and remove inactive or unused ones.",
+      "Verify that marketplace and CRM-integrated rules are correctly configured."
+    ]
+  }
+}

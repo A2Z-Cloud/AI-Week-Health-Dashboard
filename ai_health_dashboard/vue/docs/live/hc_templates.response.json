@@ -1,0 +1,65 @@
+{
+  "ok": true,
+  "section": "templates",
+  "checks": {
+    "email_templates": {
+      "status": "warning",
+      "value": {
+        "total": 44, "custom": 34, "system": 0, "plugin": 9,
+        "drafts": 0, "never_used": 14, "stale": 19,
+        "draft_examples": [],
+        "never_used_examples": [
+          "Opportunity Testing (Test_Opportunites)",
+          "Send PDF with Email (Leads)",
+          "Test email - newsletter (Leads)",
+          "Accept quote (Quotes)",
+          "Report Visit (Events)"
+        ],
+        "stale_examples": [
+          "Responsiveness test (Contacts — 513 days)",
+          "Test email - make a reservation (Contacts — 434 days)",
+          "Test email - brochure (Contacts — 427 days)",
+          "Test email - get in touch (Contacts — 434 days)",
+          "Nano Design Conference (Leads — 605 days)"
+        ],
+        "more_records": false
+      },
+      "comment": "44 email template(s) — 34 custom, 0 system, 9 plugin. 14 custom template(s) never used. 19 template(s) not used in over 365 days."
+    },
+    "inventory_templates": {
+      "status": "warning",
+      "value": {
+        "total": 6, "custom": 0, "system": 0,
+        "never_used": 4, "stale": 1,
+        "never_used_examples": [
+          "Test 2 (Quotes)",
+          "Rollup test template (Quotes)",
+          "Test wip 1 (Quotes)",
+          "Purchase Order Template (Purchase_Orders)"
+        ],
+        "stale_examples": ["Quote Template (Quotes — 729 days)"]
+      },
+      "comment": "6 inventory template(s) — 0 custom, 0 system. 4 custom template(s) never used. 1 template(s) not used in over 365 days."
+    }
+  },
+  "meta": { "fetched_at": "2026-06-10 11:45:35", "stale_days": 365 },
+  "ai_summary": {
+    "summary": "The CRM has a moderate number of email and inventory templates, with several unused or outdated ones. While custom templates are present, a significant portion is not being used or has not been updated in over a year.",
+    "critical": [],
+    "warnings": [
+      "44 email templates exist, including 14 never used and 19 stale (not used in over 365 days).",
+      "6 inventory templates are available, with 4 never used and 1 stale (not used in over 365 days)."
+    ],
+    "positives": [
+      "All email templates are custom or plugin-based with no system templates.",
+      "No system templates are present in either email or inventory categories."
+    ],
+    "recommended_actions": [
+      "Review and remove the 14 never-used email templates listed, including 'Opportunity Testing' and 'Send PDF with Email (Leads)'.",
+      "Delete or archive the 4 never-used inventory templates such as 'Test 2 (Quotes)' and 'Purchase Order Template'.",
+      "Audit all 19 stale email templates and update or retire those not used in over a year.",
+      "Check if stale inventory templates (e.g. 'Quote Template — 729 days') are still relevant.",
+      "Set up a quarterly review process to audit template usage and remove inactive ones."
+    ]
+  }
+}

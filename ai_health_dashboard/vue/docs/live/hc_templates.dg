@@ -1,0 +1,302 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_templates
+// Section : templates  (feeds email_templates + merge_templates sections)
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Captured response: hc_templates.response.json
+// auto_keys: email_templates, inventory_templates
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_templates(String params)
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+STALE_DAYS = 365;
+response = Map();
+response.put("ok",true);
+response.put("section","templates");
+checks = Map();
+meta = Map();
+today = zoho.currenttime;
+try
+{
+	// ════════════════════════════════════════════════════
+	// 1. Email templates  GET /settings/email_templates
+	// ════════════════════════════════════════════════════
+	try
+	{
+		etResp = invokeurl
+		[
+			url :BASE + "/settings/email_templates?per_page=200"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		etList = ifNull(etResp.get("email_templates"),{});
+		etInfo = ifNull(etResp.get("info"),Map());
+		etMore = ifNull(etInfo.get("more_records"),false);
+		etTotal = etList.size();
+		etDraft = 0;
+		etNeverUsed = 0;
+		etStale = 0;
+		etCustom = 0;
+		etSystem = 0;
+		etPlugin = 0;
+		etDraftNames = {};
+		etNeverUsedNames = {};
+		etStaleNames = {};
+		for each  t in etList
+		{
+			tName = ifNull(t.get("name"),"?");
+			tCat = ifNull(t.get("category"),"");
+			tLastUsed = ifNull(t.get("last_usage_time"),null);
+			tMod = ifNull(t.get("module"),Map());
+			tModName = ifNull(tMod.get("api_name"),"");
+			if(tCat == "draft")
+			{
+				etDraft = etDraft + 1;
+				if(etDraftNames.size() < 5)
+				{
+					etDraftNames.add(tName + " (" + tModName + ")");
+				}
+			}
+			else if(tCat == "normal" || tCat == "")
+			{
+				etCustom = etCustom + 1;
+			}
+			else if(tCat == "system_templates")
+			{
+				etSystem = etSystem + 1;
+			}
+			else if(tCat == "plugin_templates" || tCat == "marketplace_templates")
+			{
+				etPlugin = etPlugin + 1;
+			}
+			if(tCat != "system_templates" && tCat != "plugin_templates" && tCat != "marketplace_templates")
+			{
+				if(tLastUsed == null || tLastUsed.toString() == "" || tLastUsed.toString() == "null")
+				{
+					etNeverUsed = etNeverUsed + 1;
+					if(etNeverUsedNames.size() < 5)
+					{
+						etNeverUsedNames.add(tName + " (" + tModName + ")");
+					}
+				}
+				else
+				{
+					try
+					{
+						lastUsedDate = tLastUsed.toString().left(10).toDate("yyyy-MM-dd");
+						daysSince = daysBetween(lastUsedDate,today);
+						if(daysSince > STALE_DAYS)
+						{
+							etStale = etStale + 1;
+							if(etStaleNames.size() < 5)
+							{
+								etStaleNames.add(tName + " (" + tModName + " — " + daysSince + " days)");
+							}
+						}
+					}
+					catch (eDateE)
+					{
+					}
+				}
+			}
+		}
+		etStatus = "ok";
+		if(etDraft > 0 || etNeverUsed > 3 || etStale > 5)
+		{
+			etStatus = "warning";
+		}
+		etVal = Map();
+		etVal.put("total",etTotal);
+		etVal.put("custom",etCustom);
+		etVal.put("system",etSystem);
+		etVal.put("plugin",etPlugin);
+		etVal.put("drafts",etDraft);
+		etVal.put("never_used",etNeverUsed);
+		etVal.put("stale",etStale);
+		etVal.put("draft_examples",etDraftNames);
+		etVal.put("never_used_examples",etNeverUsedNames);
+		etVal.put("stale_examples",etStaleNames);
+		etVal.put("more_records",etMore);
+		etComment = etTotal + " email template(s) — " + etCustom + " custom, " + etSystem + " system, " + etPlugin + " plugin.";
+		if(etDraft > 0)
+		{
+			etComment = etComment + " " + etDraft + " draft(s) not yet published.";
+		}
+		if(etNeverUsed > 0)
+		{
+			etComment = etComment + " " + etNeverUsed + " custom template(s) never used.";
+		}
+		if(etStale > 0)
+		{
+			etComment = etComment + " " + etStale + " template(s) not used in over " + STALE_DAYS + " days.";
+		}
+		etCheck = Map();
+		etCheck.put("status",etStatus);
+		etCheck.put("value",etVal);
+		etCheck.put("comment",etComment);
+		checks.put("email_templates",etCheck);
+	}
+	catch (eET)
+	{
+		etCheck = Map();
+		etCheck.put("status","review");
+		etCheck.put("value",null);
+		etCheck.put("comment","Could not fetch email templates: " + eET.toString());
+		checks.put("email_templates",etCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 2. Inventory templates  GET /settings/inventory_templates
+	// ════════════════════════════════════════════════════
+	try
+	{
+		itResp = invokeurl
+		[
+			url :BASE + "/settings/inventory_templates?per_page=200"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		itList = ifNull(itResp.get("inventory_templates"),{});
+		itTotal = itList.size();
+		itNeverUsed = 0;
+		itStale = 0;
+		itCustom = 0;
+		itSystem = 0;
+		itNeverUsedNames = {};
+		itStaleNames = {};
+		for each  t in itList
+		{
+			tName = ifNull(t.get("name"),"?");
+			tCat = ifNull(t.get("category"),"");
+			tLastUsed = ifNull(t.get("last_usage_time"),null);
+			tMod = ifNull(t.get("module"),Map());
+			tModName = ifNull(tMod.get("api_name"),"");
+			if(tCat == "custom_templates" || tCat == "")
+			{
+				itCustom = itCustom + 1;
+			}
+			else if(tCat == "system_templates")
+			{
+				itSystem = itSystem + 1;
+			}
+			if(tCat != "system_templates" && tCat != "plugin_templates" && tCat != "marketplace_templates")
+			{
+				if(tLastUsed == null || tLastUsed.toString() == "" || tLastUsed.toString() == "null")
+				{
+					itNeverUsed = itNeverUsed + 1;
+					if(itNeverUsedNames.size() < 5)
+					{
+						itNeverUsedNames.add(tName + " (" + tModName + ")");
+					}
+				}
+				else
+				{
+					try
+					{
+						lastUsedDate = tLastUsed.toString().left(10).toDate("yyyy-MM-dd");
+						daysSince = daysBetween(lastUsedDate,today);
+						if(daysSince > STALE_DAYS)
+						{
+							itStale = itStale + 1;
+							if(itStaleNames.size() < 5)
+							{
+								itStaleNames.add(tName + " (" + tModName + " — " + daysSince + " days)");
+							}
+						}
+					}
+					catch (eDateI)
+					{
+					}
+				}
+			}
+		}
+		itStatus = "ok";
+		if(itNeverUsed > 2 || itStale > 3)
+		{
+			itStatus = "warning";
+		}
+		itVal = Map();
+		itVal.put("total",itTotal);
+		itVal.put("custom",itCustom);
+		itVal.put("system",itSystem);
+		itVal.put("never_used",itNeverUsed);
+		itVal.put("stale",itStale);
+		itVal.put("never_used_examples",itNeverUsedNames);
+		itVal.put("stale_examples",itStaleNames);
+		itComment = itTotal + " inventory template(s) — " + itCustom + " custom, " + itSystem + " system.";
+		if(itNeverUsed > 0)
+		{
+			itComment = itComment + " " + itNeverUsed + " custom template(s) never used.";
+		}
+		if(itStale > 0)
+		{
+			itComment = itComment + " " + itStale + " template(s) not used in over " + STALE_DAYS + " days.";
+		}
+		itCheck = Map();
+		itCheck.put("status",itStatus);
+		itCheck.put("value",itVal);
+		itCheck.put("comment",itComment);
+		checks.put("inventory_templates",itCheck);
+	}
+	catch (eIT)
+	{
+		itCheck = Map();
+		itCheck.put("status","review");
+		itCheck.put("value",null);
+		itCheck.put("comment","Could not fetch inventory templates: " + eIT.toString());
+		checks.put("inventory_templates",itCheck);
+	}
+}
+catch (e)
+{
+	response.put("ok",false);
+	response.put("error",e.toString());
+	return response.toString();
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+meta.put("stale_days",STALE_DAYS);
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),{}));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),{}));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),{}));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),{}));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}

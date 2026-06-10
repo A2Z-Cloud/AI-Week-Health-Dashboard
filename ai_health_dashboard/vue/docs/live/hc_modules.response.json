@@ -1,0 +1,87 @@
+{
+  "ok": true,
+  "section": "modules",
+  "checks": {
+    "module_visibility": {
+      "status": "ok",
+      "value": {
+        "visible_count": 107,
+        "hidden_count": 16,
+        "custom_count": 45,
+        "hidden_modules": [
+          { "api_name": "Solutions", "label": "Solution", "status": "user_hidden" },
+          { "api_name": "Rates", "label": "Rate Card", "status": "user_hidden" },
+          { "api_name": "Untitled", "label": "Untitled", "status": "user_hidden" },
+          { "api_name": "Tags", "label": "Tag", "status": "user_hidden" },
+          { "api_name": "Webinars", "label": "Webinar", "status": "user_hidden" },
+          { "api_name": "Survey_Input", "label": "SurveyInput", "status": "user_hidden" },
+          { "api_name": "units", "label": "unit", "status": "user_hidden" },
+          { "api_name": "Tags_X_Leads", "label": "Tags X Leads", "status": "user_hidden" },
+          { "api_name": "Leads_X_Deals", "label": "Leads X Deals", "status": "user_hidden" },
+          { "api_name": "Leads_X_Users", "label": "Leads X Users", "status": "user_hidden" },
+          { "api_name": "Contacts_X_Brochures", "label": "Contacts X Brochures", "status": "user_hidden" },
+          { "api_name": "DealHistory", "label": "Stage History", "status": "system_hidden" },
+          { "api_name": "Actions_Performed", "label": "Actions Performed", "status": "system_hidden" },
+          { "api_name": "Sales_Orders", "label": "Sales Order", "status": "user_hidden" },
+          { "api_name": "Appointments_Rescheduled_History__s", "label": "Appointments Rescheduled History", "status": "user_hidden" },
+          { "api_name": "Lead_Status_History", "label": "Lead Status History", "status": "user_hidden" }
+        ]
+      },
+      "comment": "107 visible module(s), 16 hidden (user/system), 45 custom."
+    },
+    "module_layouts": {
+      "status": "warning",
+      "value": { "CustomModule5001": 1, "Approvals": 0, "CustomModule5002": 1, "CustomModule5004": 1, "Leads": 2, "CustomModule5003": 1, "Contacts": 2, "Accounts": 2, "Deals": 4, "Products": 2, "Vendors": 1, "Campaigns": 5, "zohosign__ZohoSign_Document_Events": 1, "zohosign__ZohoSign_Recipients": 1, "zohosign__ZohoSign_Documents": 1 },
+      "comment": "Deal has 4 layouts.,Campaign has 5 layouts."
+    },
+    "custom_fields": {
+      "status": "warning",
+      "value": { "CustomModule5001": { "total": 39, "custom": 9 }, "Approvals": { "total": 0, "custom": 0 }, "CustomModule5002": { "total": 31, "custom": 2 }, "CustomModule5004": { "total": 30, "custom": 2 }, "Leads": { "total": 157, "custom": 93 }, "CustomModule5003": { "total": 22, "custom": 0 }, "Contacts": { "total": 115, "custom": 59 }, "Accounts": { "total": 105, "custom": 70 }, "Deals": { "total": 122, "custom": 88 }, "Products": { "total": 35, "custom": 13 }, "Vendors": { "total": 30, "custom": 3 }, "Campaigns": { "total": 52, "custom": 27 }, "zohosign__ZohoSign_Document_Events": { "total": 19, "custom": 3 }, "zohosign__ZohoSign_Recipients": { "total": 25, "custom": 9 }, "zohosign__ZohoSign_Documents": { "total": 34, "custom": 18 } },
+      "comment": "Lead has 93 custom fields — review for redundancy.,Contact has 59 custom fields — review for redundancy.,Account has 70 custom fields — review for redundancy.,Deal has 88 custom fields — review for redundancy."
+    },
+    "related_lists": {
+      "status": "ok",
+      "value": { "Leads": { "enabled": 0, "disabled": 36 }, "Contacts": { "enabled": 0, "disabled": 46 }, "Accounts": { "enabled": 0, "disabled": 42 }, "Deals": { "enabled": 0, "disabled": 42 } },
+      "comment": "Related list visibility summary per module."
+    },
+    "tags_audit": {
+      "status": "ok",
+      "value": { "Leads": { "total": 25, "zero_use": 0, "zero_use_names": [] }, "Contacts": { "total": 5, "zero_use": 0, "zero_use_names": [] }, "Accounts": { "total": 1, "zero_use": 0, "zero_use_names": [] } },
+      "comment": "No unused tags detected."
+    },
+    "record_count_baseline": {
+      "status": "warning",
+      "value": { "Leads": 1, "Contacts": 1, "Accounts": 1, "Deals": 1, "Campaigns": 1, "Products": 1, "Vendors": 1 },
+      "comment": "Lead has only 1 record(s).,Contact has only 1 record(s).,Account has only 1 record(s).,Deal has only 1 record(s)."
+    },
+    "global_picklists": {
+      "status": "warning",
+      "value": { "total": 11, "orphaned_count": 11, "orphaned": ["Source", "Industry", "relationship status", "Status 2", "Servers", "Team Member Role", "Access", "test", "Country__s", "States__s", "Countries Test"] },
+      "comment": "11 global picklist(s) not referenced by any field."
+    }
+  },
+  "meta": { "fetched_at": "2026-06-10 11:28:43", "modules_deep_checked": 15 },
+  "ai_summary": {
+    "summary": "The CRM is generally stable with most modules visible and no critical data issues. However, several areas show redundancy and inefficiency, particularly in custom fields and module layouts.",
+    "critical": [
+      "11 global picklists are orphaned and not used by any field — these should be removed immediately to avoid data inconsistencies and maintenance overhead.",
+      "Deal module has 4 layouts and 88 custom fields — this is a significant configuration burden and may affect performance and user experience."
+    ],
+    "warnings": [
+      "Lead module has 93 custom fields — this is high and may indicate redundancy; review for unnecessary or duplicated fields.",
+      "Contact module has 59 custom fields — excessive customisation may lead to data quality issues and training challenges.",
+      "Account module has 70 custom fields — similar to leads and contacts, this requires audit for relevance and necessity.",
+      "Module layouts are misaligned: Campaign has 5 layouts, Deals has 4 — this may cause confusion and inefficiency."
+    ],
+    "positives": [
+      "No unused tags detected — tag usage is clean and efficient.",
+      "All hidden modules are properly marked as user or system hidden — visibility is well-managed."
+    ],
+    "recommended_actions": [
+      "Remove the 11 orphaned global picklists immediately to clean up configuration.",
+      "Audit and reduce custom fields in Leads, Contacts, Accounts, and Deals to under 30 per module.",
+      "Review and standardise module layouts — limit to one primary layout per module where possible.",
+      "Investigate single-record or zero-record modules to determine if they are underused."
+    ]
+  }
+}

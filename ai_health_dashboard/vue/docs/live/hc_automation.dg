@@ -1,0 +1,248 @@
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE FUNCTION — hc_automation
+// Section : automation  (feeds workflows + automation sections)
+// Datacentre: zohoapis.eu | CRM connection: crm_healthcheck
+// AI summary via Zoho Creator connection: zoho_creator_ai
+// READ-ONLY. Captured response: hc_automation.response.json
+// auto_keys: workflow_limits, inactive_rules, never_executed, deprecated_rules
+// ═══════════════════════════════════════════════════════════════════════
+string standalone.hc_automation()
+{
+BASE = "https://www.zohoapis.eu/crm/v8";
+response = Map();
+response.put("ok",true);
+response.put("section","automation");
+checks = Map();
+meta = Map();
+try
+{
+	// ════════════════════════════════════════════════════
+	// 1. Workflow limits and usage
+	//    GET /settings/automation/workflow_rules/actions/rules_count
+	// ════════════════════════════════════════════════════
+	try
+	{
+		limResp = invokeurl
+		[
+			url :BASE + "/settings/automation/workflow_rules/actions/rules_count"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		rc = ifNull(limResp.get("rules_count"),Map());
+		totalConfigured = ifNull(rc.get("total_rules_configured"),0);
+		activeConfigured = ifNull(rc.get("active_rules_configured"),0);
+		totalLimit = ifNull(rc.get("total_rules_limit"),0);
+		activeLimit = ifNull(rc.get("active_rules_limit"),0);
+		inactiveCount = totalConfigured - activeConfigured;
+		limVal = Map();
+		limVal.put("total_configured",totalConfigured);
+		limVal.put("active",activeConfigured);
+		limVal.put("inactive",inactiveCount);
+		limVal.put("total_limit",totalLimit);
+		limVal.put("active_limit",activeLimit);
+		limStatus = "ok";
+		if(totalLimit > 0)
+		{
+			pctUsed = (totalConfigured * 100) / totalLimit;
+			if(pctUsed >= 80)
+			{
+				limStatus = "warning";
+			}
+		}
+		limCheck = Map();
+		limCheck.put("status",limStatus);
+		limCheck.put("value",limVal);
+		if(limStatus == "ok")
+		{
+			limCheck.put("comment",totalConfigured + " workflow rules configured (" + activeConfigured + " active, " + inactiveCount + " inactive) — well within the limit of " + totalLimit + ".");
+		}
+		else
+		{
+			limCheck.put("comment",totalConfigured + " of " + totalLimit + " workflow rules configured — approaching the limit. Consider removing unused rules.");
+		}
+		checks.put("workflow_limits",limCheck);
+	}
+	catch (eLim)
+	{
+		limCheck = Map();
+		limCheck.put("status","review");
+		limCheck.put("value",null);
+		limCheck.put("comment","Could not fetch workflow limits: " + eLim.toString());
+		checks.put("workflow_limits",limCheck);
+	}
+	// ════════════════════════════════════════════════════
+	// 2. Inactive + active (never executed + deprecated) rules
+	// ════════════════════════════════════════════════════
+	inactiveRules = {};
+	neverExecRules = {};
+	deprecatedRules = {};
+	try
+	{
+		wfResp = invokeurl
+		[
+			url :BASE + "/settings/automation/workflow_rules?per_page=200&status_active=false"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		inactiveList = ifNull(wfResp.get("workflow_rules"),{});
+		for each  r in inactiveList
+		{
+			rName = ifNull(r.get("name"),"?");
+			rMod = ifNull(r.get("module"),Map());
+			rModName = ifNull(rMod.get("api_name"),"");
+			rEntry = Map();
+			rEntry.put("name",rName);
+			rEntry.put("module",rModName);
+			inactiveRules.add(rEntry);
+		}
+	}
+	catch (eInact)
+	{
+	}
+	try
+	{
+		wfActiveResp = invokeurl
+		[
+			url :BASE + "/settings/automation/workflow_rules?per_page=200&status_active=true"
+			type :GET
+			connection:"crm_healthcheck"
+		];
+		activeList = ifNull(wfActiveResp.get("workflow_rules"),{});
+		for each  r in activeList
+		{
+			rName = ifNull(r.get("name"),"?");
+			rMod = ifNull(r.get("module"),Map());
+			rModName = ifNull(rMod.get("api_name"),"");
+			rLastExec = ifNull(r.get("last_executed_time"),null);
+			rDeprec = ifNull(r.get("deprecated"),false);
+			rSource = ifNull(r.get("source"),"crm");
+			if(rDeprec)
+			{
+				dEntry = Map();
+				dEntry.put("name",rName);
+				dEntry.put("module",rModName);
+				dEntry.put("source",rSource);
+				deprecatedRules.add(dEntry);
+			}
+			if(rLastExec == null || rLastExec.toString() == "" || rLastExec.toString() == "null")
+			{
+				nEntry = Map();
+				nEntry.put("name",rName);
+				nEntry.put("module",rModName);
+				nEntry.put("source",rSource);
+				neverExecRules.add(nEntry);
+			}
+		}
+	}
+	catch (eActive)
+	{
+	}
+	inactStatus = "ok";
+	if(inactiveRules.size() > 5)
+	{
+		inactStatus = "warning";
+	}
+	inactVal = Map();
+	inactVal.put("count",inactiveRules.size());
+	inactLimit = inactiveRules.size();
+	if(inactLimit > 5){ inactLimit = 5; }
+	inactVal.put("examples",inactiveRules.subList(0,inactLimit));
+	inactCheck = Map();
+	inactCheck.put("status",inactStatus);
+	inactCheck.put("value",inactVal);
+	if(inactStatus == "ok")
+	{
+		inactCheck.put("comment",inactiveRules.size() + " inactive rule(s) — within acceptable limits.");
+	}
+	else
+	{
+		inactCheck.put("comment",inactiveRules.size() + " inactive workflow rules — review and remove rules that are no longer needed.");
+	}
+	checks.put("inactive_rules",inactCheck);
+	neverStatus = "ok";
+	if(neverExecRules.size() > 3){ neverStatus = "warning"; }
+	neverVal = Map();
+	neverVal.put("count",neverExecRules.size());
+	neverLimit = neverExecRules.size();
+	if(neverLimit > 5){ neverLimit = 5; }
+	neverVal.put("examples",neverExecRules.subList(0,neverLimit));
+	neverCheck = Map();
+	neverCheck.put("status",neverStatus);
+	neverCheck.put("value",neverVal);
+	if(neverStatus == "ok")
+	{
+		neverCheck.put("comment",neverExecRules.size() + " active rule(s) have never been triggered — may be new or misconfigured.");
+	}
+	else
+	{
+		neverCheck.put("comment",neverExecRules.size() + " active rules have never executed — verify their trigger conditions are correct.");
+	}
+	checks.put("never_executed",neverCheck);
+	deprStatus = "ok";
+	if(deprecatedRules.size() > 0){ deprStatus = "warning"; }
+	deprCheck = Map();
+	deprCheck.put("status",deprStatus);
+	deprCheck.put("value",Map({"count":deprecatedRules.size(),"rules":deprecatedRules}));
+	if(deprStatus == "ok")
+	{
+		deprCheck.put("comment","No deprecated workflow rules found.");
+	}
+	else
+	{
+		deprCheck.put("comment",deprecatedRules.size() + " deprecated rule(s) still active — recreate or remove.");
+	}
+	checks.put("deprecated_rules",deprCheck);
+}
+catch (e)
+{
+	response.put("ok",false);
+	response.put("error",e.toString());
+	return response.toString();
+}
+response.put("checks",checks);
+meta.put("fetched_at",zoho.currenttime.toString("yyyy-MM-dd HH:mm:ss"));
+response.put("meta",meta);
+// ════════════════════════════════════════════════════
+// AI SUMMARY
+// ════════════════════════════════════════════════════
+try
+{
+	CREATOR_URL = "https://www.zohoapis.eu/creator/custom/user1_demo28/ai_summary";
+	aiBodyMap = Map();
+	aiBodyMap.put("checks_json",checks.toString());
+	aiHeaders = Map();
+	aiHeaders.put("content-type","application/json");
+	creatorResp = invokeurl
+	[
+		url :CREATOR_URL
+		type :POST
+		body:aiBodyMap.toString()
+		headers:aiHeaders
+		connection:"zoho_creator_ai"
+	];
+	creatorCode = ifNull(creatorResp.get("code"),0).toString();
+	if(creatorCode == "3000")
+	{
+		resultStr = ifNull(creatorResp.get("result"),"");
+		if(resultStr != "")
+		{
+			parsedAI = resultStr.toMap();
+			if(ifNull(parsedAI.get("ok"),false))
+			{
+				aiSummary = Map();
+				aiSummary.put("summary",ifNull(parsedAI.get("summary"),""));
+				aiSummary.put("critical",ifNull(parsedAI.get("critical"),{}));
+				aiSummary.put("warnings",ifNull(parsedAI.get("warnings"),{}));
+				aiSummary.put("positives",ifNull(parsedAI.get("positives"),{}));
+				aiSummary.put("recommended_actions",ifNull(parsedAI.get("recommended_actions"),{}));
+				response.put("ai_summary",aiSummary);
+			}
+		}
+	}
+}
+catch (eAI)
+{
+	response.put("ai_summary_error",eAI.toString());
+}
+return response.toString();
+}
