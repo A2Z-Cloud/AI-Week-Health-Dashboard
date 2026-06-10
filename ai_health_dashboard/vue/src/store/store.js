@@ -214,14 +214,14 @@ export const store = createStore({
                 const failed = results.filter(r =>
                     r.status === 'rejected' || (r.value && r.value.ok === false)
                 )
-                if (failed.length === FUNCTIONS_TO_RUN.length) {
-                    const first = failed[0]
-                    const detail = first?.status === 'rejected'
-                        ? (first.reason?.message || String(first.reason))
-                        : (first?.value?.error || 'unknown')
-                    commit('set_api_error',
-                        `All checks failed. First error — ${detail}. ` +
-                        `Check: functions deployed with exact names, REST API enabled, connection "crm_healthcheck" authorised. See browser console for details.`)
+                if (failed.length > 0) {
+                    // Collect all errors so each failed function is named in the banner
+                    const errors = failed.map(r => {
+                        if (r.status === 'rejected') return r.reason?.message || String(r.reason)
+                        return r.value?.error || 'unknown'
+                    }).filter(Boolean)
+                    const prefix = failed.length === FUNCTIONS_TO_RUN.length ? 'All checks failed' : `${failed.length} check(s) failed`
+                    commit('set_api_error', `${prefix}: ${errors.join(' | ')}`)
                 }
             } finally {
                 commit('set_running', false)

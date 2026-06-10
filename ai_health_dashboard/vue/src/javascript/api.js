@@ -119,11 +119,15 @@ export async function execute_function(function_name, params = {}) {
     }
 
     if (!parsed.ok) {
+      // Include the function name so the error banner identifies WHICH function failed
+      // and show the actual Deluge error string, not a generic message.
+      const deluge_error = parsed.error || parsed.message || 'no error detail returned'
+      try { console.error(`[hc] ${function_name} returned ok:false — Deluge error:`, deluge_error, 'full payload:', parsed) } catch (e) { /* noop */ }
       return {
         ok: false,
         section: parsed.section ?? null,
         checks: {},
-        error: parsed.error ?? 'Function returned ok:false',
+        error: `${function_name}: ${deluge_error}`,
         missing_scope: parsed.missing_scope ?? null,
         meta: parsed.meta ?? {},
       };
