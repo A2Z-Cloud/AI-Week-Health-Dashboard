@@ -1,0 +1,176 @@
+session_id: "session-2026-06-10-140000"
+timestamp: "2026-06-10 14:00:00"
+duration: "full day session"
+branch: "main"
+commit_hash: "98c9cfd"
+commit_message: |
+  feat: initial Zoho CRM Health Dashboard widget
+
+  Vue 3 + Vuex 4 + Vite 5 dashboard widget for Zoho CRM that
+  audits org health across 17 sections. Integrates with live
+  Deluge standalone functions via ZOHO.CRM.FUNCTIONS.execute().
+
+files_changed:
+  - file: ".gitignore"
+    status: "added"
+    lines_added: 9
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/app/index.html"
+    status: "added"
+    lines_added: 13
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/dist/ai_health_dashboard.zip"
+    status: "added"
+    lines_added: 0
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/plugin-manifest.json"
+    status: "added"
+    lines_added: 3
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/App.vue"
+    status: "added"
+    lines_added: 120
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/AISummary.vue"
+    status: "added"
+    lines_added: 98
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/CheckRow.vue"
+    status: "added"
+    lines_added: 237
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/HealthSidebar.vue"
+    status: "added"
+    lines_added: 150
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/ScoreRing.vue"
+    status: "added"
+    lines_added: 110
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/SectionCard.vue"
+    status: "added"
+    lines_added: 200
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/components/StatusChip.vue"
+    status: "added"
+    lines_added: 80
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/data/health_checks.js"
+    status: "added"
+    lines_added: 307
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/data/mock_responses.js"
+    status: "added"
+    lines_added: 120
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/javascript/Util.js"
+    status: "added"
+    lines_added: 115
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/javascript/api.js"
+    status: "added"
+    lines_added: 145
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/main.js"
+    status: "added"
+    lines_added: 18
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/src/store/store.js"
+    status: "added"
+    lines_added: 260
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_general_settings.dg"
+    status: "added"
+    lines_added: 280
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_modules.dg"
+    status: "added"
+    lines_added: 310
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_users.dg"
+    status: "added"
+    lines_added: 280
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_templates.dg"
+    status: "added"
+    lines_added: 260
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_automation.dg"
+    status: "added"
+    lines_added: 220
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/hc_security.dg"
+    status: "added"
+    lines_added: 210
+    lines_deleted: 0
+
+  - file: "ai_health_dashboard/vue/docs/live/README.md"
+    status: "added"
+    lines_added: 45
+    lines_deleted: 0
+
+changes_summary: |
+  Built a complete Zoho CRM Health Check Dashboard widget from scratch.
+  The widget runs inside Zoho CRM as a Dashboard type, calls live Deluge
+  standalone functions via the JS SDK after PageLoad handshake, and renders
+  17 health-check sections with scored check rows, AI summaries per section,
+  and editable manual review fields.
+
+  6 Deluge functions were built, deployed, and captured with real responses.
+  The widget's section catalogue was iteratively aligned to each live function's
+  actual auto_keys as they were submitted.
+
+key_changes:
+  - "Vue 3 + Vuex 4 + Vite 5 scaffold under ai_health_dashboard/vue/"
+  - "17-section health check catalogue (health_checks.js) as single source of truth"
+  - "Centralised Zoho SDK function executor (api.js) with robust output parsing and diagnostics"
+  - "Vuex store with Promise.allSettled fan-out — one section failure never blocks others"
+  - "PageLoad-gated API execution — fixed 'Parentwindow reference not found' timing bug"
+  - "AISummary component renders Zoho Creator AI summary per section (critical/warnings/actions/positives)"
+  - "6 live Deluge functions archived in docs/live/ with .dg source and captured .response.json"
+  - "Sections aligned to real function auto_keys: general_settings, modules, users, templates, automation, security"
+  - "Remaining 7 sections (blueprints, functions, integrations, data_mgmt, customisation, reports, data_quality) degrade cleanly to needs-review"
+  - "Production build: zet validate passes, dist/ai_health_dashboard.zip ready to upload"
+
+notes: |
+  Stack: Vue 3.4 / Vuex 4.1 / Vite 5 / Zoho JS SDK 1.2
+  Datacentre: zohoapis.eu
+  CRM connection: crm_healthcheck
+  AI summary connection: zoho_creator_ai (Zoho Creator endpoint)
+
+  Live functions deployed so far (7 total):
+    hc_general_settings, hc_modules, hc_users, hc_templates,
+    hc_automation, hc_security
+
+  Remaining functions to deploy when ready:
+    hc_blueprints, hc_functions, hc_integrations, hc_data_mgmt,
+    hc_customisation, hc_reports, hc_data_quality
+
+  To add a new function: paste source + real response — will archive
+  in docs/live/, align catalogue auto_keys, rebuild.
+
+  Dev: cd ai_health_dashboard/vue && npm run dev → http://localhost:5173
+       CRM: Dashboard widget, External hosting, base URL above
+  Prod: zet validate && zet pack → upload dist/ai_health_dashboard.zip
