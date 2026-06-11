@@ -35,13 +35,18 @@ function handle_change() {
 const v = computed(() => props.check.value)
 const vt = computed(() => props.check.value_type)
 
-// kv — flat {key: scalar} map
+// kv — flat {key: scalar} map — arrays and nested objects are skipped
 const kv_pairs = computed(() => {
     if (!v.value || typeof v.value !== 'object' || Array.isArray(v.value)) return []
     return Object.entries(v.value)
-        .filter(([, val]) => val !== null && val !== undefined && val !== '')
+        .filter(([, val]) => {
+            if (val === null || val === undefined || val === '') return false
+            if (Array.isArray(val)) return false          // skip array sub-values
+            if (typeof val === 'object') return false     // skip nested maps
+            return true
+        })
         .map(([k, val]) => ({ k: k.replace(/_/g, ' '), val: typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val) }))
-        .slice(0, 6)
+        .slice(0, 8)
 })
 
 // stale_list — [{currency, days_since, last_updated}]
@@ -141,6 +146,24 @@ const wfl = computed(() => v.value && typeof v.value === 'object' ? v.value : nu
             <dt>{{ p.k }}</dt><dd>{{ p.val }}</dd>
           </template>
         </dl>
+      </template>
+
+      <!-- mod_visibility — {visible_count, hidden_count, custom_count, hidden_modules:[]} -->
+      <template v-else-if="vt === 'mod_visibility'">
+        <dl class="val-kv">
+          <dt>visible</dt><dd>{{ v.visible_count }}</dd>
+          <dt>hidden</dt><dd>{{ v.hidden_count }}</dd>
+          <dt>custom</dt><dd>{{ v.custom_count }}</dd>
+        </dl>
+        <div class="val-tags" v-if="v.hidden_modules?.length">
+          <span
+            v-for="m in v.hidden_modules.slice(0, 6)"
+            :key="m.api_name"
+            class="val-tag"
+            :title="m.api_name"
+          >{{ m.label }}</span>
+          <span v-if="v.hidden_modules.length > 6" class="val-more">+{{ v.hidden_modules.length - 6 }}</span>
+        </div>
       </template>
 
       <!-- kv — generic flat map -->

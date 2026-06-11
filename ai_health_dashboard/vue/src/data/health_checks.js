@@ -60,7 +60,7 @@ export const HEALTH_SECTIONS = [
         fn: 'hc_modules',
         overview: 'Suggest hiding modules clearly not in use.',
         checks: [
-            check('Module visibility',                         'module_visibility',    'kv'),
+            check('Module visibility',                         'module_visibility',    'mod_visibility'),
             check('Module layouts',                            'module_layouts',       'mod_map'),
             check('Custom fields per module',                  'custom_fields',        'field_map'),
             check('Related lists',                             'related_lists',        'rl_map'),

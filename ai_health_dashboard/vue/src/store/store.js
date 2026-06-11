@@ -114,7 +114,10 @@ export const store = createStore({
 
         set_section_ai_summary(state, { key, ai_summary }) {
             const s = state.sections.find(x => x.key === key)
-            if (s) s.ai_summary = ai_summary
+            if (s) {
+                s.ai_summary = ai_summary
+                try { console.log(`[hc] ai_summary set for ${key}:`, !!ai_summary) } catch (e) { /* noop */ }
+            }
         },
 
         // Merge a function's returned `checks` map onto the matching section's check rows.
@@ -200,9 +203,11 @@ export const store = createStore({
             // section only picks up the auto_keys it actually declares.
             section_keys.forEach(key => {
                 commit('apply_section_results', { section_key: key, returned_checks: result.checks })
-                if (result.ai_summary) {
-                    commit('set_section_ai_summary', { key, ai_summary: result.ai_summary })
-                }
+                // ai_summary must be set AFTER apply_section_results so it isn't
+                // accidentally cleared by a subsequent apply_section_results call
+                // from fetch_sdk_data. Always set it regardless of previous value.
+                commit('set_section_ai_summary', { key, ai_summary: result.ai_summary ?? null })
+                try { console.log(`[hc] ${fn_name} → ${key} ai_summary present:`, !!result.ai_summary) } catch (e) { /* noop */ }
                 commit('set_section_fetch_state', { key, fetch_state: 'done' })
             })
             return { fn_name, ok: true }
@@ -242,7 +247,7 @@ export const store = createStore({
 
         // Direct SDK calls — no Deluge function needed.
         // Runs in parallel with Deluge functions; merges results into sections.
-        async fetch_sdk_data({ commit }) {
+        async fetch_sdk_data({ commit, state }) {
             await Promise.allSettled([
                 // ── Modules: enrich with SDK metadata ──────────────────────
                 (async () => {
@@ -308,11 +313,15 @@ export const store = createStore({
                             comment: `${profs.length} profile(s) configured.`
                         }
                     }
+                    // Only apply SDK supplement if Deluge hasn't already populated this section
                     if (Object.keys(sdk_checks).length > 0) {
-                        commit('apply_section_results', {
-                            section_key: 'user_management',
-                            returned_checks: sdk_checks
-                        })
+                        const s = state.sections.find(x => x.key === 'user_management')
+                        if (s && s.fetch_state !== 'done') {
+                            commit('apply_section_results', {
+                                section_key: 'user_management',
+                                returned_checks: sdk_checks
+                            })
+                        }
                     }
                 })(),
 
@@ -322,6 +331,8 @@ export const store = createStore({
                     if (!org_r.ok) return
                     const org = org_r.data?.org?.[0] ?? org_r.data ?? {}
                     if (Object.keys(org).length === 0) return
+                    const s = state.sections.find(x => x.key === 'general_settings')
+                    if (s && s.fetch_state === 'done') return  // Deluge already done, skip
                     const sdk_checks = {
                         company_details: {
                             status: 'review',
