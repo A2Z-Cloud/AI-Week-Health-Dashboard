@@ -78,25 +78,42 @@ export function format_value(value) {
 
     if (value === null || value === undefined) return '—'
 
+    // Scalar shortcut
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    if (typeof value === 'number') return String(value)
+    if (typeof value === 'string') {
+        return value.length > TRUNCATE_LIMIT ? value.slice(0, TRUNCATE_LIMIT) + '…' : value
+    }
+
+    // Render a single value to a readable string (no [object Object])
+    const render_item = (v) => {
+        if (v === null || v === undefined) return '—'
+        if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+        if (typeof v === 'number' || typeof v === 'string') return String(v)
+        if (Array.isArray(v)) return `(${v.length} items)`
+        if (typeof v === 'object') {
+            // For objects like {currency:'USD', days_since:1561} pick the most meaningful field
+            const label = v.name || v.currency || v.iso_code || v.api_name || v.label || v.email || v.module
+            if (label) return String(label)
+            // Fall back to first scalar value
+            const first_scalar = Object.values(v).find(x => typeof x !== 'object' && x !== null)
+            return first_scalar !== undefined ? String(first_scalar) : `{${Object.keys(v).join(', ')}}`
+        }
+        return String(v)
+    }
+
     if (Array.isArray(value)) {
-        const items = value.slice(0, MAX_ITEMS).map(String)
-        const result = items.join(', ') + (value.length > MAX_ITEMS ? '…' : '')
-        return result.length > TRUNCATE_LIMIT
-            ? result.slice(0, TRUNCATE_LIMIT) + '…'
-            : result
+        if (value.length === 0) return '—'
+        const items = value.slice(0, MAX_ITEMS).map(render_item)
+        const suffix = value.length > MAX_ITEMS ? ` +${value.length - MAX_ITEMS} more` : ''
+        const result = items.join(', ') + suffix
+        return result.length > TRUNCATE_LIMIT ? result.slice(0, TRUNCATE_LIMIT) + '…' : result
     }
 
     if (typeof value === 'object') {
-        // Render flat scalars as "key: val". For nested arrays/objects show a
-        // compact size hint (e.g. "users: 5") rather than [object Object].
-        const render_sub = (v) => {
-            if (Array.isArray(v)) return `${v.length}`
-            if (v !== null && typeof v === 'object') return `${Object.keys(v).length} fields`
-            return `${v}`
-        }
         const entries = Object.entries(value).slice(0, MAX_ITEMS)
         const result =
-            entries.map(([k, v]) => `${k}: ${render_sub(v)}`).join(', ') +
+            entries.map(([k, v]) => `${k}: ${render_item(v)}`).join(' · ') +
             (Object.keys(value).length > MAX_ITEMS ? '…' : '')
         return result.length > TRUNCATE_LIMIT
             ? result.slice(0, TRUNCATE_LIMIT) + '…'

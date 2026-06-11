@@ -81,32 +81,45 @@ function on_row_update(payload) {
     </div>
 
     <!-- ------------------------------------------------------------------ -->
-    <!-- Status count summary                                               -->
+    <!-- Loading state — replaces content while function is fetching        -->
     <!-- ------------------------------------------------------------------ -->
-    <div v-if="section.checks && section.checks.length" class="section-card__summary">
-      <span v-if="counts.ok"      class="pill pill--ok">{{ counts.ok }} OK</span>
-      <span v-if="counts.warning" class="pill pill--warning">{{ counts.warning }} Attention</span>
-      <span v-if="counts.bad"     class="pill pill--bad">{{ counts.bad }} Needs review</span>
-      <span v-if="counts.review"  class="pill pill--review">{{ counts.review }} Review</span>
+    <div v-if="is_loading" class="section-card__loading" aria-live="polite" aria-busy="true">
+      <div class="skeleton skeleton--wide" />
+      <div class="skeleton skeleton--medium" />
+      <div class="skeleton skeleton--wide" />
+      <div class="skeleton skeleton--narrow" />
+      <div class="skeleton skeleton--medium" />
+      <p class="loading-label">Fetching data…</p>
     </div>
 
     <!-- ------------------------------------------------------------------ -->
-    <!-- AI summary (if the function returned one)                           -->
+    <!-- Loaded content                                                      -->
     <!-- ------------------------------------------------------------------ -->
-    <AISummary v-if="section.ai_summary" :summary="section.ai_summary" />
+    <template v-else>
 
-    <!-- ------------------------------------------------------------------ -->
-    <!-- Check rows                                                          -->
-    <!-- ------------------------------------------------------------------ -->
-    <div class="section-card__checks">
-      <CheckRow
-        v-for="check in section.checks"
-        :key="check.id"
-        :check="check"
-        :section-key="section.key"
-        @update="on_row_update"
-      />
-    </div>
+      <!-- Status count summary -->
+      <div v-if="section.checks && section.checks.length" class="section-card__summary">
+        <span v-if="counts.ok"      class="pill pill--ok">{{ counts.ok }} OK</span>
+        <span v-if="counts.warning" class="pill pill--warning">{{ counts.warning }} Attention</span>
+        <span v-if="counts.bad"     class="pill pill--bad">{{ counts.bad }} Issue</span>
+        <span v-if="counts.review"  class="pill pill--review">{{ counts.review }} Review</span>
+      </div>
+
+      <!-- AI summary -->
+      <AISummary v-if="section.ai_summary" :summary="section.ai_summary" />
+
+      <!-- Check rows -->
+      <div class="section-card__checks">
+        <CheckRow
+          v-for="check in section.checks"
+          :key="check.id"
+          :check="check"
+          :section-key="section.key"
+          @update="on_row_update"
+        />
+      </div>
+
+    </template>
 
   </div>
 </template>
@@ -229,5 +242,37 @@ function on_row_update(payload) {
 /* ---- Check rows container ---- */
 .section-card__checks {
   margin-top: 14px;
+}
+
+/* ---- Loading skeleton ---- */
+.section-card__loading {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton {
+  height: 18px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f0f4f8 25%, #e2e8f0 50%, #f0f4f8 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+.skeleton--wide   { width: 100%; }
+.skeleton--medium { width: 70%; }
+.skeleton--narrow { width: 45%; }
+
+.loading-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  margin: 4px 0 0;
 }
 </style>

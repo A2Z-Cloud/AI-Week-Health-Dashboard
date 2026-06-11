@@ -146,13 +146,12 @@ function band_colour(band) {
 }
 
 .health-sidebar__item-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #1e293b;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   margin-right: 8px;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 /* Score badge */

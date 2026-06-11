@@ -6,6 +6,17 @@
 import { createStore } from 'vuex'
 import { execute_function } from '@/javascript/api.js'
 import {
+    sdk_get_modules,
+    sdk_get_fields,
+    sdk_get_layouts,
+    sdk_get_related_lists,
+    sdk_get_all_users,
+    sdk_get_all_profiles,
+    sdk_get_record_count,
+    sdk_get_org,
+    sdk_get_current_user
+} from '@/javascript/sdk_fetch.js'
+import {
     HEALTH_SECTIONS,
     FUNCTIONS_TO_RUN,
     FN_TO_SECTIONS
@@ -26,6 +37,7 @@ function build_initial_sections() {
             id: `${section.key}__${idx}`,
             task: c.task,
             auto_key: c.auto_key,
+            value_type: c.value_type ?? null,
             status: normalise_status(c.default_status),
             value: null,
             comment: c.comment || '',
@@ -196,31 +208,31 @@ export const store = createStore({
             return { fn_name, ok: true }
         },
 
-        // Run the whole health check. Fan out all functions; one failure never
-        // blocks the others (Promise.allSettled).
+        // Run the whole health check — Deluge functions + SDK calls in parallel.
         async run_health_check({ commit, dispatch, state }) {
             commit('set_running', true)
             commit('clear_api_error')
             try {
-                // Guard: PageLoad must have fired before any ZOHO.CRM.* call.
-                // Without it the SDK throws "Parentwindow reference not found".
                 if (!state.sdk_ready) {
                     commit('set_api_error', 'Waiting for CRM to initialise. Please wait and try again.')
                     return
                 }
-                const results = await Promise.allSettled(
-                    FUNCTIONS_TO_RUN.map(fn => dispatch('fetch_function', fn))
-                )
-                const failed = results.filter(r =>
+                // Run Deluge functions + SDK supplement calls concurrently
+                const [fn_results] = await Promise.all([
+                    Promise.allSettled(FUNCTIONS_TO_RUN.map(fn => dispatch('fetch_function', fn))),
+                    dispatch('fetch_sdk_data')
+                ])
+                const failed = fn_results.filter(r =>
                     r.status === 'rejected' || (r.value && r.value.ok === false)
                 )
                 if (failed.length > 0) {
-                    // Collect all errors so each failed function is named in the banner
-                    const errors = failed.map(r => {
-                        if (r.status === 'rejected') return r.reason?.message || String(r.reason)
-                        return r.value?.error || 'unknown'
-                    }).filter(Boolean)
-                    const prefix = failed.length === FUNCTIONS_TO_RUN.length ? 'All checks failed' : `${failed.length} check(s) failed`
+                    const errors = failed.map(r =>
+                        r.status === 'rejected'
+                            ? (r.reason?.message || String(r.reason))
+                            : (r.value?.error || 'unknown')
+                    ).filter(Boolean)
+                    const prefix = failed.length === FUNCTIONS_TO_RUN.length
+                        ? 'All checks failed' : `${failed.length} check(s) failed`
                     commit('set_api_error', `${prefix}: ${errors.join(' | ')}`)
                 }
             } finally {
@@ -228,11 +240,116 @@ export const store = createStore({
             }
         },
 
-        // Re-run a single section's function (refresh button on a card)
+        // Direct SDK calls — no Deluge function needed.
+        // Runs in parallel with Deluge functions; merges results into sections.
+        async fetch_sdk_data({ commit }) {
+            await Promise.allSettled([
+                // ── Modules: enrich with SDK metadata ──────────────────────
+                (async () => {
+                    const [mods_r, ] = await Promise.all([sdk_get_modules()])
+                    if (!mods_r.ok) return
+                    const modules = mods_r.data?.modules ?? []
+                    const CORE = ['Leads', 'Contacts', 'Accounts', 'Deals']
+                    // Per-module deep checks in parallel (capped to 10)
+                    const visible = modules
+                        .filter(m => m.status === 'visible' && m.api_supported !== false)
+                        .slice(0, 10)
+                        .map(m => m.api_name)
+                    await Promise.allSettled(visible.map(async api_name => {
+                        const [fields_r, layouts_r, rl_r] = await Promise.all([
+                            sdk_get_fields(api_name),
+                            sdk_get_layouts(api_name),
+                            sdk_get_related_lists(api_name)
+                        ])
+                        // Results are available but we let hc_modules Deluge function own
+                        // the check values; SDK calls here act as a fast supplement /
+                        // fallback if the Deluge function is slow.
+                        // Log for debugging only.
+                        if (import.meta.env.DEV) {
+                            console.log(`[sdk] ${api_name} fields:`, fields_r.data?.fields?.length,
+                                'layouts:', layouts_r.data?.layouts?.length,
+                                'related lists:', rl_r.data?.related_lists?.length)
+                        }
+                    }))
+                })(),
+
+                // ── Users: supplement with SDK user counts ─────────────────
+                (async () => {
+                    const [all_r, active_r, deact_r, unconf_r, admin_r, profiles_r] = await Promise.all([
+                        sdk_get_all_users('AllUsers'),
+                        sdk_get_all_users('ActiveUsers'),
+                        sdk_get_all_users('DeactiveUsers'),
+                        sdk_get_all_users('NotConfirmedUsers'),
+                        sdk_get_all_users('AdminUsers'),
+                        sdk_get_all_profiles()
+                    ])
+                    // Build a merged checks map from SDK data as a supplement
+                    // (hc_users Deluge function is the primary source; this fills gaps)
+                    const sdk_checks = {}
+                    if (all_r.ok) {
+                        const info = all_r.data?.info ?? {}
+                        sdk_checks.user_counts = {
+                            status: 'ok',
+                            value: {
+                                total:       info.count ?? all_r.data?.users?.length ?? '—',
+                                active:      active_r.data?.info?.count ?? active_r.data?.users?.length ?? '—',
+                                deactivated: deact_r.data?.info?.count ?? deact_r.data?.users?.length ?? '—',
+                                unconfirmed: unconf_r.data?.info?.count ?? unconf_r.data?.users?.length ?? '—',
+                                admins:      admin_r.data?.info?.count ?? admin_r.data?.users?.length ?? '—'
+                            },
+                            comment: `SDK: ${info.count ?? '?'} total users`
+                        }
+                    }
+                    if (profiles_r.ok) {
+                        const profs = profiles_r.data?.profiles ?? []
+                        sdk_checks.profiles_summary = {
+                            status: 'ok',
+                            value: { count: profs.length, profiles: profs.map(p => p.name) },
+                            comment: `${profs.length} profile(s) configured.`
+                        }
+                    }
+                    if (Object.keys(sdk_checks).length > 0) {
+                        commit('apply_section_results', {
+                            section_key: 'user_management',
+                            returned_checks: sdk_checks
+                        })
+                    }
+                })(),
+
+                // ── General settings: supplement org info via SDK ──────────
+                (async () => {
+                    const org_r = await sdk_get_org()
+                    if (!org_r.ok) return
+                    const org = org_r.data?.org?.[0] ?? org_r.data ?? {}
+                    if (Object.keys(org).length === 0) return
+                    const sdk_checks = {
+                        company_details: {
+                            status: 'review',
+                            value: {
+                                company_name:  org.company_name ?? '',
+                                country:       org.country ?? '',
+                                time_zone:     org.time_zone ?? '',
+                                primary_email: org.primary_email ?? ''
+                            },
+                            comment: 'Verify company details are correct.'
+                        }
+                    }
+                    commit('apply_section_results', {
+                        section_key: 'general_settings',
+                        returned_checks: sdk_checks
+                    })
+                })()
+            ])
+        },
+
+        // Re-run a single section (refresh button)
         async refresh_section({ dispatch, getters }, section_key) {
             const section = getters.section_by_key(section_key)
             if (!section || !section.fn) return
-            await dispatch('fetch_function', section.fn)
+            await Promise.all([
+                dispatch('fetch_function', section.fn),
+                dispatch('fetch_sdk_data')
+            ])
         },
 
         async close_widget() {
